@@ -1,0 +1,258 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fraunces:wght@500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --green:        #3B6D11;
+  --green-light:  #EAF3DE;
+  --green-mid:    #639922;
+  --green-dark:   #27500A;
+  --amber:        #BA7517;
+  --amber-light:  #FAEEDA;
+  --amber-mid:    #EF9F27;
+  --red:          #A32D2D;
+  --red-light:    #FCEBEB;
+  --red-mid:      #D94040;
+  --teal:         #0F6E56;
+  --teal-light:   #E1F5EE;
+  --teal-mid:     #1D9E75;
+  --gray-50:      #F4F3EE;
+  --gray-100:     #E2E0D8;
+  --gray-200:     #C8C6BC;
+  --gray-600:     #5F5E5A;
+  --bg:           #F0EFE9;
+  --surface:      #FFFFFF;
+  --border:       rgba(0,0,0,0.09);
+  --border-focus: #639922;
+  --text:         #1C1C1A;
+  --text-muted:   #6B6B66;
+  --shadow-sm:    0 1px 3px rgba(0,0,0,.08);
+  --shadow:       0 4px 16px rgba(0,0,0,.10);
+  --radius:       12px;
+  --radius-sm:    8px;
+  --radius-xs:    5px;
+  --font:         'DM Sans', sans-serif;
+  --font-display: 'Fraunces', serif;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── LAYOUT ─────────────────────────────────────── */
+.app          { display: flex; min-height: 100vh; }
+.sidebar      { width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; position: fixed; top: 0; left: 0; height: 100vh; z-index: 50; }
+.main         { flex: 1; display: flex; flex-direction: column; margin-left: 220px; min-width: 0; }
+.topbar       { background: var(--surface); border-bottom: 1px solid var(--border); padding: 13px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 40; }
+.content      { flex: 1; padding: 24px; overflow-y: auto; }
+
+/* ─── SIDEBAR ─────────────────────────────────────── */
+.sidebar-logo { padding: 20px 18px 16px; border-bottom: 1px solid var(--border); }
+.sidebar-logo h1 { font-family: var(--font-display); font-size: 20px; font-weight: 600; color: var(--green-dark); letter-spacing: -.3px; }
+.sidebar-logo p  { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.sidebar-nav  { padding: 10px 10px; flex: 1; overflow-y: auto; }
+.nav-item     { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13.5px; color: var(--text-muted); border: none; background: none; width: 100%; text-align: left; font-family: var(--font); transition: all 0.12s; margin-bottom: 2px; }
+.nav-item:hover   { background: var(--green-light); color: var(--green-dark); }
+.nav-item.active  { background: var(--green-light); color: var(--green-dark); font-weight: 600; }
+.nav-icon     { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+.sidebar-footer { padding: 14px 18px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text-muted); }
+.topbar h2    { font-size: 15px; font-weight: 600; letter-spacing: -.2px; }
+.topbar-actions { display: flex; gap: 8px; }
+
+/* ─── BUTTONS ─────────────────────────────────────── */
+.btn          { padding: 8px 16px; border-radius: var(--radius-sm); font-size: 13.5px; font-family: var(--font); font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); transition: all 0.12s; white-space: nowrap; }
+.btn:hover    { background: var(--gray-50); border-color: var(--gray-200); }
+.btn:active   { transform: scale(.98); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary  { background: var(--green); color: #fff; border-color: var(--green); box-shadow: 0 1px 4px rgba(59,109,17,.3); }
+.btn-primary:hover { background: var(--green-dark); border-color: var(--green-dark); }
+.btn-sm       { padding: 5px 11px; font-size: 12px; border-radius: var(--radius-xs); }
+.btn-danger   { color: var(--red); border-color: var(--red-light); background: var(--red-light); }
+.btn-danger:hover { background: var(--red); color: #fff; }
+.btn-icon     { padding: 7px; border-radius: var(--radius-xs); }
+
+/* Mobile FAB */
+.fab          { display: none; position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%; background: var(--green); color: #fff; font-size: 26px; border: none; box-shadow: 0 4px 16px rgba(59,109,17,.4); cursor: pointer; align-items: center; justify-content: center; z-index: 90; font-family: var(--font); transition: all .15s; }
+.fab:active   { transform: scale(.94); }
+
+/* ─── CARDS ─────────────────────────────────────── */
+.card         { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
+.card-title   { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 14px; }
+
+/* ─── METRICS ─────────────────────────────────────── */
+.metric-grid  { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.metric       { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow-sm); }
+.metric-label { font-size: 11px; font-weight: 500; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .4px; }
+.metric-value { font-size: 24px; font-weight: 600; font-family: var(--font-display); line-height: 1; }
+.metric-sub   { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.metric.green .metric-value { color: var(--green); }
+.metric.amber .metric-value { color: var(--amber); }
+.metric.red   .metric-value { color: var(--red); }
+.metric.teal  .metric-value { color: var(--teal); }
+
+/* Lucro bar dentro do metric */
+.metric-bar   { height: 3px; background: var(--gray-100); border-radius: 99px; margin-top: 10px; overflow: hidden; }
+.metric-bar-fill { height: 100%; border-radius: 99px; }
+
+/* ─── ALERTAS ─────────────────────────────────────── */
+.alertas-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.alerta-card  { border-radius: var(--radius); padding: 14px 16px; display: flex; align-items: flex-start; gap: 12px; }
+.alerta-card.urgente   { background: var(--red-light);   border: 1px solid #E8AAAA; }
+.alerta-card.aviso     { background: var(--amber-light); border: 1px solid #E8C87A; }
+.alerta-card.info      { background: var(--teal-light);  border: 1px solid #8ECFBE; }
+.alerta-icon  { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.alerta-body  { flex: 1; min-width: 0; }
+.alerta-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.alerta-card.urgente .alerta-title { color: var(--red); }
+.alerta-card.aviso   .alerta-title { color: var(--amber); }
+.alerta-card.info    .alerta-title { color: var(--teal); }
+.alerta-desc  { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+.alerta-list  { margin-top: 6px; }
+.alerta-item  { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,.05); }
+.alerta-item:last-child { border-bottom: none; }
+.alerta-item strong { color: var(--text); }
+
+/* ─── LOTE LUCRO CARDS ─────────────────────────────── */
+.lucro-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.lucro-card   { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow-sm); }
+.lucro-card-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.lucro-card-variety { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; }
+.lucro-valor  { font-size: 22px; font-weight: 600; font-family: var(--font-display); }
+.lucro-valor.pos { color: var(--green); }
+.lucro-valor.neg { color: var(--red); }
+.lucro-margem { font-size: 11px; color: var(--text-muted); margin-top: 2px; margin-bottom: 10px; }
+.lucro-bar    { height: 5px; background: var(--gray-100); border-radius: 99px; overflow: hidden; margin-bottom: 10px; }
+.lucro-bar-fill { height: 100%; border-radius: 99px; transition: width .6s ease; }
+.lucro-stats  { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+.lucro-stat   { background: var(--gray-50); border-radius: var(--radius-xs); padding: 6px 8px; }
+.lucro-stat-label { font-size: 10px; color: var(--text-muted); }
+.lucro-stat-val   { font-size: 12px; font-weight: 500; margin-top: 1px; }
+
+/* ─── TABLES ─────────────────────────────────────── */
+.table-wrap   { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table         { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th            { text-align: left; font-size: 10.5px; font-weight: 600; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+td            { padding: 11px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--gray-50); }
+
+/* ─── BADGES ─────────────────────────────────────── */
+.badge        { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.badge-green  { background: var(--green-light); color: var(--green-dark); }
+.badge-amber  { background: var(--amber-light); color: var(--amber); }
+.badge-red    { background: var(--red-light); color: var(--red); }
+.badge-teal   { background: var(--teal-light); color: var(--teal); }
+.badge-gray   { background: var(--gray-50); color: var(--gray-600); border: 1px solid var(--gray-100); }
+
+/* ─── FORMS ─────────────────────────────────────── */
+.form-grid    { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+.form-group   { display: flex; flex-direction: column; gap: 5px; }
+.form-group label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 10px 12px; border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: var(--surface); font-family: var(--font); font-size: 14px; color: var(--text);
+  outline: none; transition: border-color .12s, box-shadow .12s;
+  -webkit-appearance: none; appearance: none;
+}
+.form-group select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b6b66' d='M1 1l5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(99,153,34,.15); }
+.form-group textarea { resize: vertical; min-height: 70px; }
+.form-full    { grid-column: 1 / -1; }
+.form-readonly { background: var(--gray-50) !important; color: var(--text-muted); border-color: var(--border) !important; }
+.form-readonly:focus { box-shadow: none !important; }
+.form-hint    { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+/* Quick entry strip (mobile) */
+.quick-strip  { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; box-shadow: var(--shadow-sm); }
+.quick-strip-title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+.quick-row    { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.quick-row .form-group { flex: 1; min-width: 120px; }
+.quick-row .form-group label { font-size: 11px; }
+.quick-row .form-group input,
+.quick-row .form-group select { padding: 9px 10px; font-size: 13px; }
+
+/* ─── LOTE CARDS (tela de lotes) ─────────────────── */
+.lote-grid    { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.lote-card    { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; cursor: pointer; transition: all .15s; box-shadow: var(--shadow-sm); }
+.lote-card:hover { border-color: var(--green-mid); transform: translateY(-2px); box-shadow: var(--shadow); }
+.lote-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.lote-name    { font-size: 15px; font-weight: 600; }
+.lote-variety { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.lote-stats   { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.lote-stat-box { background: var(--gray-50); border-radius: var(--radius-xs); padding: 8px 10px; }
+.lote-stat-label { font-size: 10px; color: var(--text-muted); font-weight: 500; }
+.lote-stat-val { font-size: 14px; font-weight: 600; margin-top: 2px; }
+.lote-stat-val.pos { color: var(--green); }
+.lote-stat-val.neg { color: var(--red); }
+.profit-bar   { height: 4px; background: var(--gray-100); border-radius: 99px; overflow: hidden; margin-top: 12px; }
+.profit-bar-fill { height: 100%; border-radius: 99px; }
+
+/* ─── TABS ─────────────────────────────────────── */
+.tabs         { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 1.5px solid var(--border); }
+.tab          { padding: 9px 20px; font-size: 13.5px; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--text-muted); font-family: var(--font); border-bottom: 2.5px solid transparent; margin-bottom: -1.5px; transition: all .12s; }
+.tab:hover    { color: var(--green); }
+.tab.active   { color: var(--green); border-bottom-color: var(--green); font-weight: 600; }
+
+/* ─── MODAL ─────────────────────────────────────── */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(2px); }
+.modal        { background: var(--surface); border-radius: var(--radius); padding: 24px; width: 100%; max-width: 500px; max-height: 92vh; overflow-y: auto; box-shadow: var(--shadow); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.modal-header h3 { font-size: 17px; font-weight: 600; }
+.modal-close  { background: var(--gray-50); border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 16px; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+.modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+
+/* ─── EMPTY / LOADING ─────────────────────────────── */
+.loading      { text-align: center; padding: 48px; color: var(--text-muted); }
+.loading::before { content: '🌿'; display: block; font-size: 32px; margin-bottom: 12px; }
+.empty        { text-align: center; padding: 40px 20px; color: var(--text-muted); border: 1.5px dashed var(--gray-200); border-radius: var(--radius); font-size: 13.5px; line-height: 1.6; }
+
+/* ─── CHARTS ─────────────────────────────────────── */
+.chart-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-wrap   { position: relative; width: 100%; height: 200px; }
+
+/* Section header */
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.section-header h3 { font-size: 14px; font-weight: 600; }
+
+/* ─── RESPONSIVE ─────────────────────────────────── */
+@media (max-width: 900px) {
+  .chart-grid   { grid-template-columns: 1fr; }
+  .alertas-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .sidebar      { width: 100%; height: auto; position: fixed; bottom: 0; top: auto; left: 0; right: 0; height: 60px; flex-direction: row; border-right: none; border-top: 1px solid var(--border); z-index: 50; }
+  .sidebar-logo { display: none; }
+  .sidebar-nav  { display: flex; flex-direction: row; padding: 0; overflow-x: auto; width: 100%; }
+  .nav-item     { flex-direction: column; gap: 2px; padding: 8px 12px; font-size: 10px; border-radius: 0; margin-bottom: 0; flex: 1; justify-content: center; align-items: center; }
+  .nav-icon     { font-size: 18px; width: auto; }
+  .nav-item span:last-child { font-size: 10px; }
+  .sidebar-footer { display: none; }
+  .main         { margin-left: 0; margin-bottom: 60px; }
+  .topbar       { padding: 12px 16px; }
+  .content      { padding: 16px; }
+  .metric-grid  { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric-value { font-size: 18px; }
+  .form-grid    { grid-template-columns: 1fr; }
+  .lote-grid    { grid-template-columns: 1fr 1fr; }
+  .lucro-grid   { grid-template-columns: 1fr 1fr; }
+  .topbar-actions .btn-primary { display: none; }
+  .fab          { display: flex; }
+  .modal        { padding: 20px 16px; }
+  th, td        { padding: 8px 10px; font-size: 12px; }
+}
+
+@media (max-width: 480px) {
+  .metric-grid  { grid-template-columns: 1fr 1fr; }
+  .lote-grid    { grid-template-columns: 1fr; }
+  .lucro-grid   { grid-template-columns: 1fr; }
+}
