@@ -1,36 +1,71 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { Bar, Line } from 'react-chartjs-2'
-import {
-  Chart as ChartJS, CategoryScale, LinearScale, BarElement,
-  LineElement, PointElement, Tooltip, Filler
-} from 'chart.js'
+import { Bar } from 'react-chartjs-2'
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from 'chart.js'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Tooltip, Filler)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip)
 
+// ─── HELPERS ────────────────────────────────────────────────
+const pct = (v, t) => t > 0 ? ((v / t) * 100).toFixed(1) + '%' : '—'
+const cor = (v) => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-muted)'
+
+// ─── KPI CARD ───────────────────────────────────────────────
+function KpiCard({ icon, label, value, sub, color = 'var(--text)', bg, badge }) {
+  return (
+    <div style={{
+      background: bg ?? 'var(--surface)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      padding: '16px 20px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 4,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px' }}>{label}</span>
+        {badge && <span style={{ fontSize: 10, background: badge.bg, color: badge.color, borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>{badge.text}</span>}
+        <span style={{ fontSize: 18 }}>{icon}</span>
+      </div>
+      <div style={{ fontSize: 26, fontWeight: 800, color, fontFamily: 'var(--font-display)', lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
+    </div>
+  )
+}
+
+// ─── ALERT BANNER ───────────────────────────────────────────
+function Alert({ type, text }) {
+  const styles = {
+    warning: { bg: '#fffbeb', border: '#f59e0b', icon: '⚠️', color: '#92400e' },
+    info:    { bg: '#eff6ff', border: '#3b82f6', icon: 'ℹ️', color: '#1e40af' },
+    success: { bg: '#f0fdf4', border: '#22c55e', icon: '✅', color: '#166534' },
+  }
+  const s = styles[type] ?? styles.info
+  return (
+    <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 8, padding: '8px 14px', display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: s.color }}>
+      <span>{s.icon}</span><span>{text}</span>
+    </div>
+  )
+}
+
+// ─── MAIN ────────────────────────────────────────────────────
 export default function Dashboard() {
   const [kpis, setKpis]       = useState(null)
   const [lotes, setLotes]     = useState([])
-  const [mensal, setMensal]   = useState([])
+  const [culturas, setCulturas] = useState([])
   const [vencer, setVencer]   = useState([])
   const [atraso, setAtraso]   = useState([])
   const [receber, setReceber] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filtro, setFiltro]   = useState('mes')
-  const [mesOffset, setMesOffset] = useState(0) // 0 = mês atual, -1 = mês anterior, etc.
+  const [mesOffset, setMesOffset] = useState(0)
 
   const mesRef = useMemo(() => {
-    const d = new Date()
-    d.setDate(1)
-    d.setMonth(d.getMonth() + mesOffset)
-    return d
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + mesOffset); return d
   }, [mesOffset])
 
-  const mesLabel = useMemo(() => {
-    return mesRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-      .replace(/^\w/, c => c.toUpperCase())
-  }, [mesRef])
+  const mesLabel = useMemo(() =>
+    mesRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase())
+  , [mesRef])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -38,26 +73,17 @@ export default function Dashboard() {
     const em7d = new Date(hoje.getTime() + 7 * 86400000).toISOString().split('T')[0]
     const hojeStr = hoje.toISOString().split('T')[0]
     const mesStr = mesRef.toISOString().split('T')[0]
-
-    const [
-      { data: dash },
-      { data: resumo },
-      { data: prod },
-      { data: pagar7d },
-      { data: emAtraso },
-      { data: receberPend },
-    ] = await Promise.all([
+    const [{ data: dash }, { data: resumo }, { data: cult }, { data: pagar7d }, { data: emAtraso }, { data: receberPend }] = await Promise.all([
       supabase.rpc('fn_dashboard_mes', { p_mes: mesStr }),
       supabase.from('vw_resumo_por_lote').select('*'),
-      supabase.from('vw_producao_mensal').select('*').order('mes', { ascending: true }).limit(6),
+      supabase.from('vw_resumo_por_cultura').select('*'),
       supabase.from('vw_contas_a_pagar').select('*').gte('data_vencimento', hojeStr).lte('data_vencimento', em7d),
       supabase.from('vw_contas_a_pagar').select('*').lt('data_vencimento', hojeStr).order('data_vencimento', { ascending: true }).limit(10),
       supabase.from('vw_contas_a_receber').select('*').order('data_vencimento', { ascending: true }).limit(5),
     ])
-
     setKpis(Array.isArray(dash) ? dash[0] : dash)
     setLotes(resumo ?? [])
-    setMensal(prod ?? [])
+    setCulturas(cult ?? [])
     setVencer(pagar7d ?? [])
     setAtraso(emAtraso ?? [])
     setReceber(receberPend ?? [])
@@ -66,170 +92,195 @@ export default function Dashboard() {
 
   useEffect(() => { load() }, [load])
 
-  if (loading) return <div className="loading">Carregando painel...</div>
-
-  // Agrupa produção mensal
-  const mensalAgrup = (mensal ?? []).reduce((acc, r) => {
-    const k = r.mes_label
-    if (!acc[k]) acc[k] = { label: k, caixas: 0 }
-    acc[k].caixas += Number(r.total_caixas)
-    return acc
-  }, {})
-  const mensalArr = Object.values(mensalAgrup)
-
-  const chartOpts = (cb) => ({
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false }, tooltip: { callbacks: { label: cb } } },
-    scales: {
-      x: { grid: { color: 'rgba(0,0,0,.04)' }, ticks: { color: '#999', font: { size: 10 } } },
-      y: { grid: { color: 'rgba(0,0,0,.04)' }, ticks: { color: '#999', font: { size: 10 }, callback: v => 'R$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v) } }
-    }
-  })
-
+  // Métricas derivadas
+  const receita   = Number(kpis?.receita_mes ?? 0)
+  const custo     = Number(kpis?.custo_mes ?? 0)
+  const lucro     = Number(kpis?.lucro_mes ?? 0)
+  const caixas    = Number(kpis?.caixas_mes ?? 0)
+  const margem    = receita > 0 ? (lucro / receita * 100).toFixed(1) : 0
+  const precoMed  = caixas > 0 ? receita / caixas : 0
+  const totalLucro = lotes.reduce((s, l) => s + Number(l.lucro_bruto ?? 0), 0)
+  const cultComReceita = culturas.filter(c => Number(c.receita_total) > 0)
   const totalAtrasado = atraso.reduce((s, a) => s + Number(a.valor ?? 0), 0)
   const totalVencer   = vencer.reduce((s, v) => s + Number(v.valor ?? 0), 0)
-  const totalReceber  = receber.reduce((s, r) => s + Number(r.valor_total ?? 0), 0)
+
+  // Alertas automáticos
+  const alertas = useMemo(() => {
+    const list = []
+    if (receita > 0 && custo === 0) list.push({ type:'warning', text:'Custos não lançados no mês. O lucro pode estar superestimado.' })
+    if (cultComReceita.length === 1) list.push({ type:'info', text:`Apenas a cultura ${cultComReceita[0]?.cultura} possui vendas no período.` })
+    if (lotes.length > 0) {
+      const top = [...lotes].sort((a,b)=>Number(b.receita_bruta)-Number(a.receita_bruta))[0]
+      if (top && receita > 0 && Number(top.receita_bruta)/receita > 0.7) list.push({ type:'info', text:`O lote ${top.lote} concentra ${pct(Number(top.receita_bruta), receita)} da receita do mês.` })
+    }
+    if (totalAtrasado > 0) list.push({ type:'warning', text:`${atraso.length} conta(s) em atraso totalizando ${fmt(totalAtrasado)}.` })
+    return list
+  }, [kpis, lotes, culturas, atraso])
+
+  // Resumo executivo
+  const resumoExec = useMemo(() => {
+    if (!receita) return 'Nenhuma venda registrada no período.'
+    const nLotes = lotes.filter(l => Number(l.receita_bruta) > 0).length
+    const cultDesc = cultComReceita.length === 1 ? `A cultura ${cultComReceita[0]?.cultura} representa 100% da receita.` : `${cultComReceita.length} culturas geraram receita no período.`
+    const custoDesc = custo === 0 ? 'Não há custos lançados.' : `Custos lançados: ${fmt(custo)}.`
+    return `No período, foram vendidas ${caixas.toLocaleString('pt-BR')} caixas em ${nLotes} lote(s), gerando ${fmt(receita)}. ${cultDesc} ${custoDesc}`
+  }, [kpis, lotes, culturas])
+
+  if (loading) return <div className="loading">Carregando painel...</div>
 
   return (
-    <>
-      {/* Navegação de meses */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16, flexWrap:'wrap' }}>
-        <button className="btn btn-sm" onClick={()=>setMesOffset(o=>o-1)}>← Anterior</button>
-        <div style={{ fontWeight:700, fontSize:16, flex:1, textAlign:'center', color:'var(--green)' }}>
-          {mesLabel}
-          {mesOffset === 0 && <span className="badge badge-green" style={{ marginLeft:8, fontSize:10 }}>Mês atual</span>}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+      {/* CABEÇALHO + NAVEGAÇÃO */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <button className="btn btn-sm" onClick={() => setMesOffset(o => o - 1)}>←</button>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--green)' }}>{mesLabel}</span>
+          {mesOffset === 0 && <span style={{ marginLeft: 8, fontSize: 11, background: 'var(--green-light)', color: 'var(--green)', borderRadius: 4, padding: '2px 7px', fontWeight: 600 }}>Mês atual</span>}
         </div>
-        <button className="btn btn-sm" onClick={()=>setMesOffset(o=>Math.min(o+1,0))} disabled={mesOffset===0}>Próximo →</button>
-        {mesOffset !== 0 && <button className="btn btn-sm" onClick={()=>setMesOffset(0)}>Hoje</button>}
+        <button className="btn btn-sm" onClick={() => setMesOffset(o => Math.min(o + 1, 0))} disabled={mesOffset === 0}>→</button>
+        {mesOffset !== 0 && <button className="btn btn-sm" onClick={() => setMesOffset(0)}>Hoje</button>}
       </div>
 
-      {/* KPIs */}
-      <div className="metric-grid">
-        <div className="metric teal">
-          <div className="metric-label">Receita do mês</div>
-          <div className="metric-value">{fmt(kpis?.receita_mes)}</div>
-          <div className="metric-sub">A receber: {fmt(kpis?.total_a_receber ?? 0)}</div>
-          <div className="metric-bar"><div className="metric-bar-fill" style={{ width: '100%', background: 'var(--teal-mid)' }} /></div>
-        </div>
-        <div className="metric amber">
-          <div className="metric-label">Custos do mês</div>
-          <div className="metric-value">{fmt(kpis?.custo_mes)}</div>
-          <div className="metric-sub">A pagar: {fmt(kpis?.total_a_pagar ?? 0)}</div>
-          <div className="metric-bar"><div className="metric-bar-fill" style={{ width: kpis?.receita_mes > 0 ? Math.min(((kpis?.custo_mes ?? 0)/(kpis?.receita_mes ?? 1))*100, 100)+'%' : '0%', background: 'var(--amber-mid)' }} /></div>
-        </div>
-        <div className={`metric ${Number(kpis?.lucro_mes) >= 0 ? 'green' : 'red'}`}>
-          <div className="metric-label">Lucro do mês</div>
-          <div className="metric-value">{fmt(kpis?.lucro_mes)}</div>
-          <div className="metric-sub">
-            Margem {kpis?.receita_mes > 0 ? ((kpis.lucro_mes / kpis.receita_mes) * 100).toFixed(1) + '%' : '—'}
-          </div>
-          <div className="metric-bar"><div className="metric-bar-fill" style={{ width: kpis?.receita_mes > 0 ? Math.max(0, Math.min(((kpis?.lucro_mes ?? 0)/(kpis?.receita_mes ?? 1))*100, 100))+'%' : '0%', background: 'var(--green-mid)' }} /></div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">Caixas do mês</div>
-          <div className="metric-label">Caixas do mês</div>
-          <div className="metric-value">{Number(kpis?.caixas_mes ?? 0).toLocaleString('pt-BR')}</div>
-          <div className="metric-sub">{kpis?.caixas_mes > 0 ? `${((kpis?.caixas_mes ?? 0) / 20).toFixed(1)} cargas est.` : 'Sem produção'}</div>
-        </div>
+      {/* KPI CARDS */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
+        <KpiCard icon="💰" label="Receita" value={fmt(receita)} sub={`A receber: ${fmt(kpis?.total_a_receber)}`} color="var(--teal)" />
+        <KpiCard icon="💸" label="Custos" value={fmt(custo)} sub={`A pagar: ${fmt(kpis?.total_a_pagar)}`} color={custo > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
+        <KpiCard icon="📈" label="Lucro" value={fmt(lucro)} sub={`Margem: ${margem}%`} color={cor(lucro)} />
+        <KpiCard icon="📦" label="Caixas" value={caixas.toLocaleString('pt-BR')} sub="vendidas no período" color="var(--text)" />
+        <KpiCard icon="🏷️" label="Preço médio/cx" value={precoMed > 0 ? fmt(precoMed) : '—'} sub="receita ÷ caixas" color="var(--text)" />
+        <KpiCard icon="%" label="Margem" value={margem > 0 ? `${margem}%` : '—'} sub="lucro ÷ receita" color={Number(margem) >= 30 ? 'var(--green)' : Number(margem) > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
       </div>
 
       {/* ALERTAS */}
+      {alertas.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {alertas.map((a, i) => <Alert key={i} {...a} />)}
+        </div>
+      )}
+
+      {/* RESUMO EXECUTIVO */}
+      {receita > 0 && (
+        <div style={{ background: 'var(--green-light)', border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', padding: '14px 18px' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>📋 Resumo executivo</div>
+          <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>{resumoExec}</div>
+        </div>
+      )}
+
+      {/* ALERTAS FINANCEIROS */}
       {(atraso.length > 0 || vencer.length > 0 || receber.length > 0) && (
-        <div className="alertas-grid">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
           {atraso.length > 0 && (
-            <div className="alerta-card urgente">
-              <div className="alerta-icon">🚨</div>
-              <div className="alerta-body">
-                <div className="alerta-title">{atraso.length} conta{atraso.length > 1 ? 's' : ''} em atraso — {fmt(totalAtrasado)}</div>
-                <div className="alerta-list">
-                  {atraso.slice(0, 3).map(a => (
-                    <div key={a.id} className="alerta-item">
-                      <span>{a.descricao?.substring(0, 22) ?? a.fornecedor}</span>
-                      <strong>{fmt(a.valor)}</strong>
-                    </div>
-                  ))}
-                  {atraso.length > 3 && <div className="alerta-desc">+{atraso.length - 3} mais...</div>}
+            <div style={{ background: '#fff5f5', border: '1px solid var(--red-mid)', borderRadius: 'var(--radius)', padding: '12px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--red)', marginBottom: 8 }}>🚨 {atraso.length} em atraso — {fmt(totalAtrasado)}</div>
+              {atraso.slice(0, 3).map(a => (
+                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4, color: 'var(--text)' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>{a.descricao ?? a.fornecedor}</span>
+                  <strong>{fmt(a.valor)}</strong>
                 </div>
-              </div>
+              ))}
             </div>
           )}
-
           {vencer.length > 0 && (
-            <div className="alerta-card aviso">
-              <div className="alerta-icon">⚠️</div>
-              <div className="alerta-body">
-                <div className="alerta-title">{vencer.length} vence{vencer.length > 1 ? 'm' : ''} em 7 dias — {fmt(totalVencer)}</div>
-                <div className="alerta-list">
-                  {vencer.slice(0, 3).map(v => (
-                    <div key={v.id} className="alerta-item">
-                      <span>{fmtDate(v.data_vencimento)} · {v.lote}</span>
-                      <strong>{fmt(v.valor)}</strong>
-                    </div>
-                  ))}
+            <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 'var(--radius)', padding: '12px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 8 }}>⚠️ {vencer.length} vencem em 7 dias — {fmt(totalVencer)}</div>
+              {vencer.slice(0, 3).map(v => (
+                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                  <span>{fmtDate(v.data_vencimento)} · {v.lote}</span>
+                  <strong>{fmt(v.valor)}</strong>
                 </div>
-              </div>
+              ))}
             </div>
           )}
-
           {receber.length > 0 && (
-            <div className="alerta-card info">
-              <div className="alerta-icon">💰</div>
-              <div className="alerta-body">
-                <div className="alerta-title">{receber.length} a receber — {fmt(totalReceber)}</div>
-                <div className="alerta-list">
-                  {receber.slice(0, 3).map(r => (
-                    <div key={r.id} className="alerta-item">
-                      <span>{r.comprador?.substring(0, 18)}</span>
-                      <strong>{fmt(r.valor_total)}</strong>
-                    </div>
-                  ))}
+            <div style={{ background: '#f0fdf4', border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', padding: '12px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--green)', marginBottom: 8 }}>💰 {receber.length} a receber — {fmt(receber.reduce((s,r)=>s+Number(r.valor_total??0),0))}</div>
+              {receber.slice(0, 3).map(r => (
+                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                  <span>{r.comprador?.substring(0, 20)}</span>
+                  <strong>{fmt(r.valor_total)}</strong>
                 </div>
-              </div>
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* LUCRO POR LOTE — ranking compacto */}
-      <div className="card">
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-          <div className="card-title" style={{ marginBottom:0 }}>🏆 Ranking por lucro</div>
-          <span style={{ fontSize:12, color:'var(--text-muted)' }}>{lotes.length} lotes</span>
+      {/* GRÁFICOS */}
+      {lotes.some(l => Number(l.receita_bruta) > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          <GraficoBarras
+            title="Receita por lote"
+            labels={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>l.lote)}
+            data={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>Number(l.receita_bruta))}
+            color="rgba(29,158,117,.8)"
+          />
+          {cultComReceita.length > 1 && (
+            <GraficoBarras
+              title="Receita por cultura"
+              labels={cultComReceita.map(c=>c.cultura)}
+              data={cultComReceita.map(c=>Number(c.receita_total))}
+              color="rgba(59,130,246,.7)"
+            />
+          )}
+        </div>
+      )}
+
+      {/* RANKING LOTES */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>🏆 Ranking por lucro</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{lotes.length} lotes</span>
         </div>
         {lotes.length === 0
           ? <div className="empty">Sem dados ainda</div>
           : <div className="table-wrap">
               <table>
                 <thead>
-                  <tr>
-                    <th style={{width:28}}>#</th>
+                  <tr style={{ background: 'var(--bg)' }}>
+                    <th style={{ width: 28, textAlign: 'center' }}>#</th>
                     <th>Lote</th>
-                    <th style={{textAlign:'right'}}>Receita</th>
-                    <th style={{textAlign:'right'}}>Custo</th>
-                    <th style={{textAlign:'right'}}>Lucro</th>
-                    <th style={{textAlign:'right'}}>Margem</th>
-                    <th style={{width:100}}>Barra</th>
+                    <th>Cultura</th>
+                    <th style={{ textAlign: 'right' }}>Caixas</th>
+                    <th style={{ textAlign: 'right' }}>Receita</th>
+                    <th style={{ textAlign: 'right' }}>Custo</th>
+                    <th style={{ textAlign: 'right' }}>Lucro</th>
+                    <th style={{ textAlign: 'right' }}>Preço/cx</th>
+                    <th style={{ textAlign: 'right' }}>Margem</th>
+                    <th style={{ textAlign: 'right' }}>Part. %</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...lotes].sort((a,b)=>Number(b.lucro_bruto)-Number(a.lucro_bruto)).map((l,i)=>{
-                    const lucro  = Number(l.lucro_bruto)
-                    const margem = Number(l.margem_pct)
-                    const maxLucro = Math.max(...lotes.map(x=>Math.abs(Number(x.lucro_bruto))),1)
-                    const barW = Math.min(Math.abs(lucro)/maxLucro*100,100)
-                    const cor = lucro>=0?(margem>=40?'var(--green)':'var(--amber)'):'var(--red)'
+                  {[...lotes].sort((a, b) => Number(b.lucro_bruto) - Number(a.lucro_bruto)).map((l, i) => {
+                    const rec    = Number(l.receita_bruta)
+                    const cst    = Number(l.custo_total)
+                    const luc    = Number(l.lucro_bruto)
+                    const cx     = Number(l.total_caixas_produzidas)
+                    const mg     = rec > 0 ? (luc / rec * 100).toFixed(1) : 0
+                    const pm     = cx > 0 ? rec / cx : 0
+                    const part   = totalLucro > 0 ? (luc / totalLucro * 100).toFixed(1) : 0
+                    const corLuc = luc > 0 ? 'var(--green)' : luc < 0 ? 'var(--red)' : 'var(--text-muted)'
+                    const semMov = rec === 0
                     return (
-                      <tr key={l.lote_id}>
-                        <td style={{color:'var(--text-muted)',fontSize:12,fontWeight:600}}>{i+1}</td>
+                      <tr key={l.lote_id} style={{ opacity: semMov ? 0.45 : 1 }}>
+                        <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>{i + 1}</td>
                         <td><strong>{l.lote}</strong></td>
-                        <td style={{textAlign:'right',color:'var(--teal)',fontSize:13}}>{fmt(l.receita_bruta)}</td>
-                        <td style={{textAlign:'right',color:'var(--amber)',fontSize:13}}>{fmt(l.custo_total)}</td>
-                        <td style={{textAlign:'right',fontWeight:700,color:cor}}>{fmt(lucro)}</td>
-                        <td style={{textAlign:'right',fontWeight:600,color:cor,fontSize:13}}>{margem.toFixed(1)}%</td>
-                        <td>
-                          <div style={{background:'var(--bg)',borderRadius:4,height:8,overflow:'hidden'}}>
-                            <div style={{width:barW+'%',height:'100%',background:cor,borderRadius:4,transition:'width .3s'}} />
-                          </div>
+                        <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l.variedade ?? '—'}</td>
+                        <td style={{ textAlign: 'right', fontSize: 13 }}>{cx.toLocaleString('pt-BR')}</td>
+                        <td style={{ textAlign: 'right', color: 'var(--teal)', fontWeight: 600, fontSize: 13 }}>{fmt(rec)}</td>
+                        <td style={{ textAlign: 'right', color: 'var(--amber)', fontSize: 13 }}>{fmt(cst)}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, color: corLuc }}>{fmt(luc)}</td>
+                        <td style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-muted)' }}>{pm > 0 ? fmt(pm) : '—'}</td>
+                        <td style={{ textAlign: 'right', fontWeight: 600, color: Number(mg) >= 30 ? 'var(--green)' : 'var(--amber)', fontSize: 13 }}>{mg > 0 ? mg + '%' : '—'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          {luc > 0 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
+                              <div style={{ width: 40, height: 6, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden' }}>
+                                <div style={{ width: Math.min(Number(part), 100) + '%', height: '100%', background: 'var(--green)', borderRadius: 3 }} />
+                              </div>
+                              <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 32 }}>{part}%</span>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )
@@ -240,109 +291,96 @@ export default function Dashboard() {
       </div>
 
       {/* RESUMO POR CULTURA */}
-      <ResumoCulturas />
-
-      {/* GRÁFICOS */}
-      <div className="chart-grid">
-        <div className="card">
-          <div className="card-title">Receita vs Custo por lote</div>
-          <div className="chart-wrap">
-            {lotes.length > 0 ? (
-              <Bar
-                data={{
-                  labels: lotes.map(l => l.lote),
-                  datasets: [
-                    { label: 'Receita', data: lotes.map(l => Number(l.receita_bruta)), backgroundColor: 'rgba(29,158,117,.75)', borderRadius: 4 },
-                    { label: 'Custo',   data: lotes.map(l => Number(l.custo_total)),   backgroundColor: 'rgba(186,117,23,.75)',  borderRadius: 4 },
-                  ]
-                }}
-                options={{
-                  ...chartOpts(ctx => fmt(ctx.raw)),
-                  plugins: { ...chartOpts().plugins, legend: { display: true, labels: { font: { size: 11 }, boxWidth: 12 } } }
-                }}
-              />
-            ) : <div className="empty">Sem dados</div>}
-          </div>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+          <span style={{ fontWeight: 700, fontSize: 15 }}>🌿 Resumo por cultura</span>
         </div>
-        <div className="card">
-          <div className="card-title">Produção mensal (caixas)</div>
-          <div className="chart-wrap">
-            {mensalArr.length > 0 ? (
-              <Line
-                data={{
-                  labels: mensalArr.map(m => m.label),
-                  datasets: [{
-                    data: mensalArr.map(m => m.caixas),
-                    borderColor: '#1D9E75', backgroundColor: 'rgba(29,158,117,.10)',
-                    fill: true, tension: 0.4, pointBackgroundColor: '#1D9E75', pointRadius: 4,
-                  }]
-                }}
-                options={chartOpts(ctx => ctx.raw.toLocaleString('pt-BR') + ' cx')}
-              />
-            ) : <div className="empty">Sem dados</div>}
-          </div>
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {culturas.length === 0
+            ? <div className="empty">Nenhuma cultura cadastrada</div>
+            : culturas.map(c => {
+                const rec  = Number(c.receita_total)
+                const cst  = Number(c.custo_total)
+                const luc  = rec - cst
+                const ativo = rec > 0
+                const maxR = Math.max(...culturas.map(x => Number(x.receita_total)), 1)
+                return (
+                  <div key={c.cultura} style={{
+                    background: ativo ? 'var(--surface)' : 'var(--bg)',
+                    border: `1px solid ${ativo ? 'var(--border)' : 'transparent'}`,
+                    borderRadius: 8,
+                    padding: '12px 14px',
+                    opacity: ativo ? 1 : 0.5,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: ativo ? 10 : 0 }}>
+                      <div>
+                        <span style={{ fontWeight: ativo ? 700 : 500, fontSize: 14, color: ativo ? 'var(--text)' : 'var(--text-muted)' }}>{c.cultura}</span>
+                        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)' }}>{c.qtd_lotes} lote(s) · {c.qtd_setores} setor(es)</span>
+                        {!ativo && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>sem vendas</span>}
+                      </div>
+                      {ativo && (
+                        <div style={{ display: 'flex', gap: 20, flexShrink: 0 }}>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Caixas</div>
+                            <div style={{ fontWeight: 600, fontSize: 13 }}>{Number(c.total_caixas).toLocaleString('pt-BR')}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Receita</div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--teal)' }}>{fmt(rec)}</div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Lucro</div>
+                            <div style={{ fontWeight: 700, fontSize: 14, color: cor(luc) }}>{fmt(luc)}</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {ativo && (
+                      <>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                          <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                            <div style={{ width: Math.min(rec / maxR * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, var(--teal), var(--green))', borderRadius: 4 }} />
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {pct(rec, culturas.reduce((s,x)=>s+Number(x.receita_total),0))} da receita total
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )
+              })}
         </div>
       </div>
-    </>
+
+    </div>
   )
 }
 
-function ResumoCulturas() {
-  const [culturas, setCulturas] = useState([])
-  useEffect(() => {
-    supabase.from('vw_resumo_por_cultura').select('*').then(({ data }) => setCulturas(data??[]))
-  }, [])
-  if (!culturas.length) return null
-  const maxReceita = Math.max(...culturas.map(c=>Number(c.receita_total)),1)
+// ─── GRÁFICO DE BARRAS HORIZONTAL ───────────────────────────
+function GraficoBarras({ title, labels, data, color }) {
+  const max = Math.max(...data, 1)
   return (
-    <div className="card">
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-        <div className="card-title" style={{ marginBottom:0 }}>🌿 Resumo por cultura</div>
-        <span style={{ fontSize:12, color:'var(--text-muted)' }}>{culturas.length} cultura(s)</span>
-      </div>
-      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-        {culturas.map(c => {
-          const receita = Number(c.receita_total)
-          const custo   = Number(c.custo_total)
-          const lucro   = receita - custo
-          const barW    = Math.min(receita/maxReceita*100, 100)
-          return (
-            <div key={c.cultura} style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-              <div style={{ minWidth:100, fontWeight:600, fontSize:13 }}>{c.cultura}</div>
-              <div style={{ fontSize:11, color:'var(--text-muted)', minWidth:80 }}>{c.qtd_lotes} lote(s) · {c.qtd_setores} setor(es)</div>
-              <div style={{ flex:1, minWidth:120 }}>
-                <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)', marginBottom:3 }}>
-                  <span>Receita</span>
-                  <span>{barW.toFixed(0)}% do total</span>
-                </div>
-                <div style={{ background:'var(--bg)', borderRadius:6, height:10, overflow:'hidden', position:'relative' }}>
-                  <div style={{ width:barW+'%', height:'100%', background:'linear-gradient(90deg, var(--teal), var(--green))', borderRadius:6, transition:'width .4s' }} />
-                  {custo > 0 && (
-                    <div style={{ position:'absolute', top:0, left:0, width:Math.min(custo/maxReceita*100,100)+'%', height:'100%', background:'rgba(186,117,23,0.35)', borderRadius:6 }} />
-                  )}
-                </div>
-                <div style={{ display:'flex', gap:8, marginTop:3, fontSize:10, color:'var(--text-muted)' }}>
-                  <span style={{ color:'var(--teal)' }}>■ Receita</span>
-                  {custo > 0 && <span style={{ color:'var(--amber)' }}>■ Custo</span>}
-                </div>
-              </div>
-              <div style={{ display:'flex', gap:16, flexShrink:0 }}>
-                <div style={{ textAlign:'right' }}>
-                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Caixas</div>
-                  <div style={{ fontWeight:600, fontSize:13 }}>{Number(c.total_caixas).toLocaleString('pt-BR')}</div>
-                </div>
-                <div style={{ textAlign:'right' }}>
-                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Receita</div>
-                  <div style={{ fontWeight:600, fontSize:13, color:'var(--teal)' }}>{fmt(receita)}</div>
-                </div>
-                <div style={{ textAlign:'right' }}>
-                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Lucro</div>
-                  <div style={{ fontWeight:700, fontSize:13, color:lucro>=0?'var(--green)':'var(--red)' }}>{fmt(lucro)}</div>
-                </div>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 18px' }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {labels.map((label, i) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ minWidth: 60, fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
+            <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 4, height: 20, overflow: 'hidden', position: 'relative' }}>
+              <div style={{
+                width: Math.min(data[i] / max * 100, 100) + '%',
+                height: '100%',
+                background: color,
+                borderRadius: 4,
+                transition: 'width .4s',
+                display: 'flex', alignItems: 'center', paddingLeft: 6,
+              }}>
+                <span style={{ fontSize: 10, color: 'white', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmt(data[i])}</span>
               </div>
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
     </div>
   )
