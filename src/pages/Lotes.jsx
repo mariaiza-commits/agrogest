@@ -30,6 +30,12 @@ export default function Lotes({ onAddBtn }) {
     setLoading(false)
   }
 
+  async function excluir(id) {
+    if (!window.confirm('Excluir este lote? Todos os dados vinculados (produção, vendas, custos) serão apagados.')) return
+    await supabase.from('lotes').delete().eq('id', id)
+    load()
+  }
+
   function openModal(lote = null) {
     if (lote) {
       setForm({ nome:lote.nome, area_hectares:lote.area_hectares, variedade:lote.variedade, data_plantio:lote.data_plantio?.split('T')[0]??'', status:lote.status, quantidade_setores:lote.quantidade_setores??1, localizacao:lote.localizacao??'', observacoes:lote.observacoes??'' })
@@ -86,6 +92,9 @@ export default function Lotes({ onAddBtn }) {
                 <div className="lote-stat-box"><div className="lote-stat-label">Margem</div><div className={`lote-stat-val ${margem>=40?'pos':'neg'}`}>{margem.toFixed(1)}%</div></div>
               </div>
               <div className="profit-bar"><div className="profit-bar-fill" style={{ width: `${Math.min(margem,100)}%` }} /></div>
+              <div style={{display:'flex',justifyContent:'flex-end',marginTop:8}}>
+                <button className="btn btn-sm btn-danger" onClick={e=>{e.stopPropagation();excluir(l.id)}} style={{fontSize:11}}>✕ Excluir</button>
+              </div>
             </div>
           )
         })}
