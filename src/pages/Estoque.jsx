@@ -86,8 +86,18 @@ export default function Estoque({ onAddBtn }) {
     await supabase.from('movimentacoes_estoque').delete().eq('id',id); load()
   }
 
-  const stCor = { zerado:'var(--red)', critico:'var(--red)', baixo:'var(--amber)', ok:'var(--green)' }
-  const stLabel = { zerado:'Zerado', critico:'Crítico', baixo:'Baixo', ok:'OK' }
+  async function excluirInsumo(id) {
+    if (!window.confirm('Excluir este insumo? As movimentações vinculadas também serão apagadas.')) return
+    await supabase.from('movimentacoes_estoque').delete().eq('insumo_id', id)
+    await supabase.from('insumos').delete().eq('id', id)
+    load()
+  }
+
+  async function toggleStatus(ins) {
+    const novoStatus = ins.status === 'ativo' ? 'inativo' : 'ativo'
+    await supabase.from('insumos').update({ status: novoStatus }).eq('id', ins.id)
+    load()
+  }
 
   function getStatus(ins) {
     if (ins.estoque_atual<=0) return 'zerado'
@@ -97,6 +107,9 @@ export default function Estoque({ onAddBtn }) {
   }
 
   if (loading) return <div className="loading">Carregando estoque...</div>
+
+  const stCor = { zerado:'var(--red)', critico:'var(--red)', baixo:'var(--amber)', ok:'var(--green)' }
+  const stLabel = { zerado:'Zerado', critico:'Crítico', baixo:'Baixo', ok:'OK' }
 
   return (
     <>
@@ -128,7 +141,7 @@ export default function Estoque({ onAddBtn }) {
         : <div className="card">
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Insumo</th><th>Categoria</th><th>Unidade</th><th>Estoque atual</th><th>Mínimo</th><th>Custo médio</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Insumo</th><th>Categoria</th><th>Unidade</th><th>Estoque atual</th><th>Mínimo</th><th>Custo médio</th><th>Nível</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                   {insumos.map(ins=>{
                     const st=getStatus(ins)
@@ -141,8 +154,11 @@ export default function Estoque({ onAddBtn }) {
                         <td style={{color:'var(--text-muted)'}}>{Number(ins.estoque_minimo).toFixed(2)}</td>
                         <td>{fmt(ins.custo_medio)}/{ins.unidade}</td>
                         <td><span className="badge" style={{background:st==='ok'?'var(--green-light)':st==='baixo'?'var(--amber-light)':'var(--red-light)',color:stCor[st]}}>{stLabel[st]}</span></td>
+                        <td><span className="badge" style={{background:ins.status==='inativo'?'var(--amber-light)':'var(--green-light)',color:ins.status==='inativo'?'var(--amber)':'var(--green)'}}>{ins.status==='inativo'?'Inativo':'Em uso'}</span></td>
                         <td><div style={{display:'flex',gap:4}}>
                           <button className="btn btn-sm" onClick={()=>openModalIns(ins)}>✎</button>
+                          <button className="btn btn-sm" style={{fontSize:10,background:ins.status==='inativo'?'var(--amber-light)':'var(--green-light)',color:ins.status==='inativo'?'var(--amber)':'var(--green)',borderColor:'transparent'}} onClick={()=>toggleStatus(ins)}>{ins.status==='inativo'?'▶ Reativar':'⏸ Pausar'}</button>
+                          <button className="btn btn-sm btn-danger" onClick={()=>excluirInsumo(ins.id)}>✕</button>
                           <button className="btn btn-sm" style={{color:'var(--teal)',borderColor:'var(--teal-light)',background:'var(--teal-light)'}} onClick={()=>{setFormMov({...EMPTY_MOV,insumo_id:ins.id});setModalMov(true)}}>+ Mov.</button>
                         </div></td>
                       </tr>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { Bar, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS, CategoryScale, LinearScale, BarElement,
@@ -13,18 +13,31 @@ export default function Dashboard() {
   const [kpis, setKpis]       = useState(null)
   const [lotes, setLotes]     = useState([])
   const [mensal, setMensal]   = useState([])
-  const [vencer, setVencer]   = useState([])  // contas a pagar vencendo
-  const [atraso, setAtraso]   = useState([])  // contas em atraso
-  const [receber, setReceber] = useState([])  // a receber
+  const [vencer, setVencer]   = useState([])
+  const [atraso, setAtraso]   = useState([])
+  const [receber, setReceber] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filtro, setFiltro]   = useState('mes') // mes | trimestre | tudo
+  const [filtro, setFiltro]   = useState('mes')
+  const [mesOffset, setMesOffset] = useState(0) // 0 = mês atual, -1 = mês anterior, etc.
+
+  const mesRef = useMemo(() => {
+    const d = new Date()
+    d.setDate(1)
+    d.setMonth(d.getMonth() + mesOffset)
+    return d
+  }, [mesOffset])
+
+  const mesLabel = useMemo(() => {
+    return mesRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      .replace(/^\w/, c => c.toUpperCase())
+  }, [mesRef])
 
   const load = useCallback(async () => {
     setLoading(true)
     const hoje = new Date()
     const em7d = new Date(hoje.getTime() + 7 * 86400000).toISOString().split('T')[0]
-    const em3d = new Date(hoje.getTime() + 3 * 86400000).toISOString().split('T')[0]
     const hojeStr = hoje.toISOString().split('T')[0]
+    const mesStr = mesRef.toISOString().split('T')[0]
 
     const [
       { data: dash },
@@ -34,30 +47,22 @@ export default function Dashboard() {
       { data: emAtraso },
       { data: receberPend },
     ] = await Promise.all([
-      supabase.from('vw_dashboard_mensal').select('*').single(),
+      supabase.rpc('fn_dashboard_mes', { p_mes: mesStr }),
       supabase.from('vw_resumo_por_lote').select('*'),
       supabase.from('vw_producao_mensal').select('*').order('mes', { ascending: true }).limit(6),
-      // Vencendo em 7 dias (não atrasado ainda)
-      supabase.from('vw_contas_a_pagar').select('*')
-        .gte('data_vencimento', hojeStr)
-        .lte('data_vencimento', em7d),
-      // Já atrasado
-      supabase.from('vw_contas_a_pagar').select('*')
-        .lt('data_vencimento', hojeStr)
-        .order('data_vencimento', { ascending: true }).limit(10),
-      // A receber pendente
-      supabase.from('vw_contas_a_receber').select('*')
-        .order('data_vencimento', { ascending: true }).limit(5),
+      supabase.from('vw_contas_a_pagar').select('*').gte('data_vencimento', hojeStr).lte('data_vencimento', em7d),
+      supabase.from('vw_contas_a_pagar').select('*').lt('data_vencimento', hojeStr).order('data_vencimento', { ascending: true }).limit(10),
+      supabase.from('vw_contas_a_receber').select('*').order('data_vencimento', { ascending: true }).limit(5),
     ])
 
-    setKpis(dash)
+    setKpis(Array.isArray(dash) ? dash[0] : dash)
     setLotes(resumo ?? [])
     setMensal(prod ?? [])
     setVencer(pagar7d ?? [])
     setAtraso(emAtraso ?? [])
     setReceber(receberPend ?? [])
     setLoading(false)
-  }, [])
+  }, [mesRef])
 
   useEffect(() => { load() }, [load])
 
@@ -87,18 +92,29 @@ export default function Dashboard() {
 
   return (
     <>
+      {/* Navegação de meses */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16, flexWrap:'wrap' }}>
+        <button className="btn btn-sm" onClick={()=>setMesOffset(o=>o-1)}>← Anterior</button>
+        <div style={{ fontWeight:700, fontSize:16, flex:1, textAlign:'center', color:'var(--green)' }}>
+          {mesLabel}
+          {mesOffset === 0 && <span className="badge badge-green" style={{ marginLeft:8, fontSize:10 }}>Mês atual</span>}
+        </div>
+        <button className="btn btn-sm" onClick={()=>setMesOffset(o=>Math.min(o+1,0))} disabled={mesOffset===0}>Próximo →</button>
+        {mesOffset !== 0 && <button className="btn btn-sm" onClick={()=>setMesOffset(0)}>Hoje</button>}
+      </div>
+
       {/* KPIs */}
       <div className="metric-grid">
         <div className="metric teal">
           <div className="metric-label">Receita do mês</div>
           <div className="metric-value">{fmt(kpis?.receita_mes)}</div>
-          <div className="metric-sub">Recebido: {fmt((kpis?.receita_mes ?? 0) - (kpis?.total_a_receber ?? 0))}</div>
+          <div className="metric-sub">A receber: {fmt(kpis?.total_a_receber ?? 0)}</div>
           <div className="metric-bar"><div className="metric-bar-fill" style={{ width: '100%', background: 'var(--teal-mid)' }} /></div>
         </div>
         <div className="metric amber">
           <div className="metric-label">Custos do mês</div>
           <div className="metric-value">{fmt(kpis?.custo_mes)}</div>
-          <div className="metric-sub">Pago: {fmt((kpis?.custo_mes ?? 0) - (kpis?.total_a_pagar ?? 0))}</div>
+          <div className="metric-sub">A pagar: {fmt(kpis?.total_a_pagar ?? 0)}</div>
           <div className="metric-bar"><div className="metric-bar-fill" style={{ width: kpis?.receita_mes > 0 ? Math.min(((kpis?.custo_mes ?? 0)/(kpis?.receita_mes ?? 1))*100, 100)+'%' : '0%', background: 'var(--amber-mid)' }} /></div>
         </div>
         <div className={`metric ${Number(kpis?.lucro_mes) >= 0 ? 'green' : 'red'}`}>
@@ -111,8 +127,9 @@ export default function Dashboard() {
         </div>
         <div className="metric">
           <div className="metric-label">Caixas do mês</div>
+          <div className="metric-label">Caixas do mês</div>
           <div className="metric-value">{Number(kpis?.caixas_mes ?? 0).toLocaleString('pt-BR')}</div>
-          <div className="metric-sub">{((kpis?.caixas_mes ?? 0) / 20).toFixed(1)} cargas</div>
+          <div className="metric-sub">{kpis?.caixas_mes > 0 ? `${((kpis?.caixas_mes ?? 0) / 20).toFixed(1)} cargas est.` : 'Sem produção'}</div>
         </div>
       </div>
 
@@ -173,58 +190,57 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* LUCRO POR LOTE */}
+      {/* LUCRO POR LOTE — ranking compacto */}
       <div className="card">
-        <div className="section-header">
-          <div className="card-title" style={{ marginBottom: 0 }}>Lucro por lote</div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+          <div className="card-title" style={{ marginBottom:0 }}>🏆 Ranking por lucro</div>
+          <span style={{ fontSize:12, color:'var(--text-muted)' }}>{lotes.length} lotes</span>
         </div>
         {lotes.length === 0
-          ? <div className="empty">Sem dados ainda — registre vendas e custos</div>
-          : (
-            <div className="lucro-grid">
-              {[...lotes].sort((a, b) => Number(b.lucro_bruto) - Number(a.lucro_bruto)).map(l => {
-                const lucro = Number(l.lucro_bruto)
-                const margem = Number(l.margem_pct)
-                const maxLucro = Math.max(...lotes.map(x => Math.abs(Number(x.lucro_bruto))), 1)
-                const barW = Math.min(Math.abs(lucro) / maxLucro * 100, 100)
-                return (
-                  <div key={l.lote_id} className="lucro-card">
-                    <div className="lucro-card-name">{l.lote}</div>
-                    <div className="lucro-card-variety">{l.variedade} · {l.area_hectares} ha</div>
-                    <div className={`lucro-valor ${lucro >= 0 ? 'pos' : 'neg'}`}>{fmt(lucro)}</div>
-                    <div className="lucro-margem">Margem {margem.toFixed(1)}%</div>
-                    <div className="lucro-bar">
-                      <div className="lucro-bar-fill" style={{
-                        width: barW + '%',
-                        background: lucro >= 0
-                          ? (margem >= 50 ? 'var(--green)' : 'var(--amber-mid)')
-                          : 'var(--red-mid)'
-                      }} />
-                    </div>
-                    <div className="lucro-stats">
-                      <div className="lucro-stat">
-                        <div className="lucro-stat-label">Receita</div>
-                        <div className="lucro-stat-val" style={{ color: 'var(--teal)' }}>{fmt(l.receita_bruta)}</div>
-                      </div>
-                      <div className="lucro-stat">
-                        <div className="lucro-stat-label">Custo</div>
-                        <div className="lucro-stat-val" style={{ color: 'var(--amber)' }}>{fmt(l.custo_total)}</div>
-                      </div>
-                      <div className="lucro-stat">
-                        <div className="lucro-stat-label">Caixas</div>
-                        <div className="lucro-stat-val">{Number(l.total_caixas_produzidas).toLocaleString()}</div>
-                      </div>
-                      <div className="lucro-stat">
-                        <div className="lucro-stat-label">cx/ha</div>
-                        <div className="lucro-stat-val">{Number(l.caixas_por_hectare).toFixed(0)}</div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          ? <div className="empty">Sem dados ainda</div>
+          : <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{width:28}}>#</th>
+                    <th>Lote</th>
+                    <th style={{textAlign:'right'}}>Receita</th>
+                    <th style={{textAlign:'right'}}>Custo</th>
+                    <th style={{textAlign:'right'}}>Lucro</th>
+                    <th style={{textAlign:'right'}}>Margem</th>
+                    <th style={{width:100}}>Barra</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...lotes].sort((a,b)=>Number(b.lucro_bruto)-Number(a.lucro_bruto)).map((l,i)=>{
+                    const lucro  = Number(l.lucro_bruto)
+                    const margem = Number(l.margem_pct)
+                    const maxLucro = Math.max(...lotes.map(x=>Math.abs(Number(x.lucro_bruto))),1)
+                    const barW = Math.min(Math.abs(lucro)/maxLucro*100,100)
+                    const cor = lucro>=0?(margem>=40?'var(--green)':'var(--amber)'):'var(--red)'
+                    return (
+                      <tr key={l.lote_id}>
+                        <td style={{color:'var(--text-muted)',fontSize:12,fontWeight:600}}>{i+1}</td>
+                        <td><strong>{l.lote}</strong></td>
+                        <td style={{textAlign:'right',color:'var(--teal)',fontSize:13}}>{fmt(l.receita_bruta)}</td>
+                        <td style={{textAlign:'right',color:'var(--amber)',fontSize:13}}>{fmt(l.custo_total)}</td>
+                        <td style={{textAlign:'right',fontWeight:700,color:cor}}>{fmt(lucro)}</td>
+                        <td style={{textAlign:'right',fontWeight:600,color:cor,fontSize:13}}>{margem.toFixed(1)}%</td>
+                        <td>
+                          <div style={{background:'var(--bg)',borderRadius:4,height:8,overflow:'hidden'}}>
+                            <div style={{width:barW+'%',height:'100%',background:cor,borderRadius:4,transition:'width .3s'}} />
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>}
       </div>
+
+      {/* RESUMO POR CULTURA */}
+      <ResumoCulturas />
 
       {/* GRÁFICOS */}
       <div className="chart-grid">
@@ -268,5 +284,66 @@ export default function Dashboard() {
         </div>
       </div>
     </>
+  )
+}
+
+function ResumoCulturas() {
+  const [culturas, setCulturas] = useState([])
+  useEffect(() => {
+    supabase.from('vw_resumo_por_cultura').select('*').then(({ data }) => setCulturas(data??[]))
+  }, [])
+  if (!culturas.length) return null
+  const maxReceita = Math.max(...culturas.map(c=>Number(c.receita_total)),1)
+  return (
+    <div className="card">
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+        <div className="card-title" style={{ marginBottom:0 }}>🌿 Resumo por cultura</div>
+        <span style={{ fontSize:12, color:'var(--text-muted)' }}>{culturas.length} cultura(s)</span>
+      </div>
+      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+        {culturas.map(c => {
+          const receita = Number(c.receita_total)
+          const custo   = Number(c.custo_total)
+          const lucro   = receita - custo
+          const barW    = Math.min(receita/maxReceita*100, 100)
+          return (
+            <div key={c.cultura} style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+              <div style={{ minWidth:100, fontWeight:600, fontSize:13 }}>{c.cultura}</div>
+              <div style={{ fontSize:11, color:'var(--text-muted)', minWidth:80 }}>{c.qtd_lotes} lote(s) · {c.qtd_setores} setor(es)</div>
+              <div style={{ flex:1, minWidth:120 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:'var(--text-muted)', marginBottom:3 }}>
+                  <span>Receita</span>
+                  <span>{barW.toFixed(0)}% do total</span>
+                </div>
+                <div style={{ background:'var(--bg)', borderRadius:6, height:10, overflow:'hidden', position:'relative' }}>
+                  <div style={{ width:barW+'%', height:'100%', background:'linear-gradient(90deg, var(--teal), var(--green))', borderRadius:6, transition:'width .4s' }} />
+                  {custo > 0 && (
+                    <div style={{ position:'absolute', top:0, left:0, width:Math.min(custo/maxReceita*100,100)+'%', height:'100%', background:'rgba(186,117,23,0.35)', borderRadius:6 }} />
+                  )}
+                </div>
+                <div style={{ display:'flex', gap:8, marginTop:3, fontSize:10, color:'var(--text-muted)' }}>
+                  <span style={{ color:'var(--teal)' }}>■ Receita</span>
+                  {custo > 0 && <span style={{ color:'var(--amber)' }}>■ Custo</span>}
+                </div>
+              </div>
+              <div style={{ display:'flex', gap:16, flexShrink:0 }}>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Caixas</div>
+                  <div style={{ fontWeight:600, fontSize:13 }}>{Number(c.total_caixas).toLocaleString('pt-BR')}</div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Receita</div>
+                  <div style={{ fontWeight:600, fontSize:13, color:'var(--teal)' }}>{fmt(receita)}</div>
+                </div>
+                <div style={{ textAlign:'right' }}>
+                  <div style={{ fontSize:10, color:'var(--text-muted)' }}>Lucro</div>
+                  <div style={{ fontWeight:700, fontSize:13, color:lucro>=0?'var(--green)':'var(--red)' }}>{fmt(lucro)}</div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }

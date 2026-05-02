@@ -151,13 +151,41 @@ export default function Financeiro() {
 
   useEffect(()=>{ load() },[load])
 
+  const [modalAjuste, setModalAjuste] = useState(null) // conta a ajustar
+  const [ajusteValor, setAjusteValor] = useState('')
+  const [ajusteTipo, setAjusteTipo] = useState('ajuste')
+
+  async function excluirMov(id) {
+    if (!window.confirm('Excluir esta movimentação? O saldo da conta será recalculado.')) return
+    await supabase.from('movimentacoes_financeiras').delete().eq('id', id)
+    load()
+  }
+
+  async function salvarAjuste() {
+    if (!ajusteValor || parseFloat(ajusteValor) <= 0) return alert('Informe o valor.')
+    await supabase.from('movimentacoes_financeiras').insert({
+      conta_financeira_id: modalAjuste.id,
+      tipo: ajusteTipo,
+      origem: 'ajuste',
+      valor: parseFloat(ajusteValor),
+      data: new Date().toISOString().split('T')[0],
+      descricao: 'Ajuste manual de saldo'
+    })
+    setModalAjuste(null); setAjusteValor(''); load()
+  }
+
   async function transferir() {
-    if (!tOrigem||!tDestino||!tValor) return alert('Preencha todos os campos.')
-    if (tOrigem===tDestino) return alert('Conta de origem e destino não podem ser iguais.')
-    if (parseFloat(tValor)<=0) return alert('Valor deve ser maior que zero.')
+    if (!tOrigem || !tDestino || !tValor || parseFloat(tValor) <= 0) return alert('Preencha todos os campos com valores válidos.')
+    if (tOrigem === tDestino) return alert('Conta de origem e destino não podem ser iguais.')
     setTransf(true)
-    const {error}=await supabase.rpc('fn_transferir',{p_origem_id:tOrigem,p_destino_id:tDestino,p_valor:parseFloat(tValor),p_data:tData,p_descricao:tDesc})
-    if (error) alert('Erro: '+error.message)
+    const { error } = await supabase.rpc('fn_transferir', {
+      p_origem_id: tOrigem,
+      p_destino_id: tDestino,
+      p_valor: parseFloat(tValor),
+      p_data: tData,
+      p_descricao: tDesc || 'Transferência'
+    })
+    if (error) { alert('Erro: ' + error.message); setTransf(false); return }
     setTransf(false); setTValor(''); load()
   }
 
@@ -236,6 +264,7 @@ export default function Financeiro() {
                         <div style={{fontSize:11,color:'var(--text-muted)',textTransform:'uppercase'}}>{c.tipo}</div>
                       </div>
                       <button className="btn btn-sm" onClick={()=>{setFormConta({nome:c.nome,tipo:c.tipo});setEditContaId(c.id);setModalConta(true)}}>✎</button>
+                      <button className="btn btn-sm" style={{color:'var(--teal)',borderColor:'var(--teal-light)',background:'var(--teal-light)'}} onClick={()=>{setModalAjuste(c);setAjusteValor('');setAjusteTipo('entrada')}}>± Ajustar</button>
                     </div>
                     <div style={{fontWeight:700,fontSize:24,fontFamily:'var(--font-display)',color:c.saldo_atual>=0?'var(--green)':'var(--red)'}}>{fmt(c.saldo_atual)}</div>
                     <div style={{display:'flex',gap:12,marginTop:10,fontSize:12,color:'var(--text-muted)'}}>
@@ -275,7 +304,7 @@ export default function Financeiro() {
             : <div className="card">
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>Data</th><th>Conta</th><th>Tipo</th><th>Origem</th><th>Descrição</th><th style={{textAlign:'right'}}>Valor</th><th style={{textAlign:'right'}}>Saldo acum.</th></tr></thead>
+                    <thead><tr><th>Data</th><th>Conta</th><th>Tipo</th><th>Origem</th><th>Descrição</th><th style={{textAlign:'right'}}>Valor</th><th style={{textAlign:'right'}}>Saldo acum.</th><th></th></tr></thead>
                     <tbody>
                       {fluxoFiltrado.map(f=>(
                         <tr key={f.id}>
@@ -286,6 +315,7 @@ export default function Financeiro() {
                           <td style={{maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.descricao}</td>
                           <td style={{textAlign:'right',fontWeight:600,color:f.tipo==='entrada'?'var(--green)':'var(--red)'}}>{f.tipo==='entrada'?'+':'-'}{fmt(f.valor)}</td>
                           <td style={{textAlign:'right',fontWeight:600,color:Number(f.saldo_acumulado)>=0?'var(--teal)':'var(--red)'}}>{fmt(f.saldo_acumulado)}</td>
+                          <td><button className="btn btn-sm btn-danger" onClick={()=>excluirMov(f.id)}>✕</button></td>
                         </tr>
                       ))}
                     </tbody>
@@ -356,6 +386,37 @@ export default function Financeiro() {
           <button className="btn btn-primary" style={{width:'100%'}} onClick={transferir} disabled={transferindo}>
             {transferindo?'Transferindo...':'🔄 Confirmar transferência'}
           </button>
+        </div>
+      )}
+
+      {/* Modal ajuste de saldo */}
+      {modalAjuste&&(
+        <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModalAjuste(null)}>
+          <div className="modal" style={{maxWidth:380}}>
+            <div className="modal-header">
+              <h3>Ajustar saldo — {modalAjuste.nome}</h3>
+              <button className="modal-close" onClick={()=>setModalAjuste(null)}>✕</button>
+            </div>
+            <div style={{background:'var(--teal-light)',borderRadius:'var(--radius-sm)',padding:'10px 14px',marginBottom:16}}>
+              <div style={{fontSize:12,color:'var(--teal)'}}>Saldo atual</div>
+              <div style={{fontSize:22,fontWeight:700,color:'var(--teal)'}}>{fmt(modalAjuste.saldo_atual)}</div>
+            </div>
+            <div className="form-grid">
+              <div className="form-group form-full"><label>Tipo de ajuste</label>
+                <select value={ajusteTipo} onChange={e=>setAjusteTipo(e.target.value)}>
+                  <option value="entrada">↑ Entrada (adicionar)</option>
+                  <option value="saida">↓ Saída (subtrair)</option>
+                </select>
+              </div>
+              <div className="form-group form-full"><label>Valor (R$) *</label>
+                <input type="number" inputMode="decimal" step="0.01" autoFocus value={ajusteValor} onChange={e=>setAjusteValor(e.target.value)} placeholder="0,00" />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={()=>setModalAjuste(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={salvarAjuste} style={{flex:1}}>✓ Confirmar ajuste</button>
+            </div>
+          </div>
         </div>
       )}
 
