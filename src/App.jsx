@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import Login         from './pages/Login'
 import Dashboard     from './pages/Dashboard'
 import Lotes         from './pages/Lotes'
 import Producao      from './pages/Producao'
@@ -33,8 +34,12 @@ const ADD_LABELS = {
 
 export default function App() {
   const [page, setPage] = useState('dashboard')
+  const [logado, setLogado] = useState(localStorage.getItem('frutminas_auth') === 'true')
   const addRef = useRef(null)
 
+  if (!logado) return <Login onLogin={() => setLogado(true)} />
+
+  function sair() { localStorage.removeItem('frutminas_auth'); setLogado(false) }
   function navigate(p) { addRef.current = null; setPage(p) }
   function registerAddBtn(fn) { addRef.current = fn }
 
@@ -53,7 +58,12 @@ export default function App() {
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">FrutMinas v2.0</div>
+        <div className="sidebar-footer">
+          FrutMinas v2.0
+          <button onClick={sair} style={{display:'block',marginTop:8,background:'none',border:'none',color:'var(--text-muted)',cursor:'pointer',fontSize:12,padding:0}}>
+            🚪 Sair
+          </button>
+        </div>
       </div>
 
       <div className="main">
