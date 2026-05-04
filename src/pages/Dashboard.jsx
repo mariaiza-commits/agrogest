@@ -1,63 +1,83 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { Bar } from 'react-chartjs-2'
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from 'chart.js'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip)
-
 // ─── HELPERS ────────────────────────────────────────────────
-const pct = (v, t) => t > 0 ? ((v / t) * 100).toFixed(1) + '%' : '—'
-const cor = (v) => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-muted)'
+const cor  = v => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-muted)'
+const pct  = (v, t) => t > 0 ? ((v / t) * 100).toFixed(1) + '%' : '—'
 
-// ─── KPI CARD ───────────────────────────────────────────────
-function KpiCard({ icon, label, value, sub, color = 'var(--text)', bg, badge }) {
+// ─── BADGE DE STATUS ────────────────────────────────────────
+function StatusBadge({ status }) {
+  const map = {
+    atrasado: { bg: '#fee2e2', color: '#991b1b', label: '🔴 Atrasado' },
+    hoje:     { bg: '#fef3c7', color: '#92400e', label: '🟡 Hoje' },
+    urgente:  { bg: '#fff7ed', color: '#c2410c', label: '🟠 Urgente' },
+    proximo:  { bg: '#f0fdf4', color: '#166534', label: '🟢 Em breve' },
+    ok:       { bg: '#f8fafc', color: '#64748b', label: '⚪ OK' },
+  }
+  const s = map[status] ?? map.ok
   return (
-    <div style={{
-      background: bg ?? 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
-      padding: '16px 20px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 4,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px' }}>{label}</span>
-        {badge && <span style={{ fontSize: 10, background: badge.bg, color: badge.color, borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>{badge.text}</span>}
+    <span style={{ fontSize: 11, background: s.bg, color: s.color, borderRadius: 4, padding: '2px 7px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+      {s.label}
+    </span>
+  )
+}
+
+// ─── CARD SECÇÃO ────────────────────────────────────────────
+function Secao({ icon, titulo, badge, children, cor: corBorda = 'var(--border)' }) {
+  return (
+    <div style={{ background: 'var(--surface)', border: `1px solid ${corBorda}`, borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+      <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
         <span style={{ fontSize: 18 }}>{icon}</span>
+        <span style={{ fontWeight: 700, fontSize: 15, flex: 1 }}>{titulo}</span>
+        {badge}
       </div>
-      <div style={{ fontSize: 26, fontWeight: 800, color, fontFamily: 'var(--font-display)', lineHeight: 1.1 }}>{value}</div>
-      {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
+      <div style={{ padding: '14px 18px' }}>{children}</div>
     </div>
   )
 }
 
-// ─── ALERT BANNER ───────────────────────────────────────────
-function Alert({ type, text }) {
-  const styles = {
-    warning: { bg: '#fffbeb', border: '#f59e0b', icon: '⚠️', color: '#92400e' },
-    info:    { bg: '#eff6ff', border: '#3b82f6', icon: 'ℹ️', color: '#1e40af' },
-    success: { bg: '#f0fdf4', border: '#22c55e', icon: '✅', color: '#166534' },
-  }
-  const s = styles[type] ?? styles.info
+// ─── KPI MINI ────────────────────────────────────────────────
+function KpiMini({ label, value, color = 'var(--text)', sub }) {
   return (
-    <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 8, padding: '8px 14px', display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, color: s.color }}>
-      <span>{s.icon}</span><span>{text}</span>
+    <div style={{ flex: 1, minWidth: 120, padding: '10px 14px', background: 'var(--bg)', borderRadius: 8 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1, fontFamily: 'var(--font-display)' }}>{value}</div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
+    </div>
+  )
+}
+
+// ─── BARRA HORIZONTAL ────────────────────────────────────────
+function BarraH({ value, max, color = 'var(--green)', label, sub }) {
+  const w = max > 0 ? Math.min(value / max * 100, 100) : 0
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+      <div style={{ minWidth: 80, fontWeight: 600, fontSize: 13 }}>{label}</div>
+      <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 4, height: 22, overflow: 'hidden', position: 'relative' }}>
+        <div style={{ width: w + '%', height: '100%', background: color, borderRadius: 4, transition: 'width .4s', display: 'flex', alignItems: 'center', paddingLeft: 8 }}>
+          {w > 20 && <span style={{ fontSize: 11, color: 'white', fontWeight: 600 }}>{fmt(value)}</span>}
+        </div>
+        {w <= 20 && <span style={{ position: 'absolute', left: w + '%', paddingLeft: 8, fontSize: 11, color: 'var(--text-muted)', top: '50%', transform: 'translateY(-50%)' }}>{fmt(value)}</span>}
+      </div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 60, textAlign: 'right' }}>{sub}</div>}
     </div>
   )
 }
 
 // ─── MAIN ────────────────────────────────────────────────────
 export default function Dashboard() {
-  const [kpis, setKpis]       = useState(null)
-  const [lotes, setLotes]     = useState([])
-  const [culturas, setCulturas] = useState([])
-  const [vencer, setVencer]   = useState([])
-  const [atraso, setAtraso]   = useState([])
-  const [receber, setReceber] = useState([])
-  const [loading, setLoading] = useState(true)
   const [mesOffset, setMesOffset] = useState(0)
+  const [loading, setLoading]     = useState(true)
+
+  // Dados
+  const [kpis, setKpis]           = useState(null)
+  const [saldoConsolidado, setSaldo] = useState(null)
+  const [contasDia, setContasDia] = useState([])
+  const [inadimplentes, setInadim] = useState([])
+  const [lucroCultura, setLucroCultura] = useState([])
+  const [agenda, setAgenda]       = useState([])
+  const [lotes, setLotes]         = useState([])
 
   const mesRef = useMemo(() => {
     const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + mesOffset); return d
@@ -69,319 +89,295 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const hoje = new Date()
-    const em7d = new Date(hoje.getTime() + 7 * 86400000).toISOString().split('T')[0]
-    const hojeStr = hoje.toISOString().split('T')[0]
     const mesStr = mesRef.toISOString().split('T')[0]
-    const [{ data: dash }, { data: resumo }, { data: cult }, { data: pagar7d }, { data: emAtraso }, { data: receberPend }] = await Promise.all([
+
+    const [
+      { data: dash },
+      { data: saldo },
+      { data: contas },
+      { data: inadim },
+      { data: cult },
+      { data: ag },
+      { data: resumo },
+    ] = await Promise.all([
       supabase.rpc('fn_dashboard_mes', { p_mes: mesStr }),
+      supabase.from('vw_saldo_consolidado').select('*').single(),
+      supabase.from('vw_contas_do_dia').select('*'),
+      supabase.from('vw_inadimplencia').select('*').limit(5),
+      supabase.from('vw_lucro_por_cultura').select('*'),
+      supabase.from('vw_agenda_campo').select('*').limit(10),
       supabase.from('vw_resumo_por_lote').select('*'),
-      supabase.from('vw_resumo_por_cultura').select('*'),
-      supabase.from('vw_contas_a_pagar').select('*').gte('data_vencimento', hojeStr).lte('data_vencimento', em7d),
-      supabase.from('vw_contas_a_pagar').select('*').lt('data_vencimento', hojeStr).order('data_vencimento', { ascending: true }).limit(10),
-      supabase.from('vw_contas_a_receber').select('*').order('data_vencimento', { ascending: true }).limit(5),
     ])
+
     setKpis(Array.isArray(dash) ? dash[0] : dash)
+    setSaldo(saldo)
+    setContasDia(contas ?? [])
+    setInadim(inadim ?? [])
+    setLucroCultura(cult ?? [])
+    setAgenda(ag ?? [])
     setLotes(resumo ?? [])
-    setCulturas(cult ?? [])
-    setVencer(pagar7d ?? [])
-    setAtraso(emAtraso ?? [])
-    setReceber(receberPend ?? [])
     setLoading(false)
   }, [mesRef])
 
   useEffect(() => { load() }, [load])
 
   // Métricas derivadas
-  const receita   = Number(kpis?.receita_mes ?? 0)
-  const custo     = Number(kpis?.custo_mes ?? 0)
-  const lucro     = Number(kpis?.lucro_mes ?? 0)
-  const caixas    = Number(kpis?.caixas_mes ?? 0)
-  const margem    = receita > 0 ? (lucro / receita * 100).toFixed(1) : 0
-  const precoMed  = caixas > 0 ? receita / caixas : 0
-  const totalLucro = lotes.reduce((s, l) => s + Number(l.lucro_bruto ?? 0), 0)
-  const cultComReceita = culturas.filter(c => Number(c.receita_total) > 0)
-  const totalAtrasado = atraso.reduce((s, a) => s + Number(a.valor ?? 0), 0)
-  const totalVencer   = vencer.reduce((s, v) => s + Number(v.valor ?? 0), 0)
+  const receita  = Number(kpis?.receita_mes ?? 0)
+  const custo    = Number(kpis?.custo_mes ?? 0)
+  const lucro    = Number(kpis?.lucro_mes ?? 0)
+  const caixas   = Number(kpis?.caixas_mes ?? 0)
+  const margem   = receita > 0 ? (lucro / receita * 100).toFixed(1) : 0
+  const precoMed = caixas > 0 ? receita / caixas : 0
 
-  // Alertas automáticos
-  const alertas = useMemo(() => {
-    const list = []
-    if (receita > 0 && custo === 0) list.push({ type:'warning', text:'Custos não lançados no mês. O lucro pode estar superestimado.' })
-    if (cultComReceita.length === 1) list.push({ type:'info', text:`Apenas a cultura ${cultComReceita[0]?.cultura} possui vendas no período.` })
-    if (lotes.length > 0) {
-      const top = [...lotes].sort((a,b)=>Number(b.receita_bruta)-Number(a.receita_bruta))[0]
-      if (top && receita > 0 && Number(top.receita_bruta)/receita > 0.7) list.push({ type:'info', text:`O lote ${top.lote} concentra ${pct(Number(top.receita_bruta), receita)} da receita do mês.` })
-    }
-    if (totalAtrasado > 0) list.push({ type:'warning', text:`${atraso.length} conta(s) em atraso totalizando ${fmt(totalAtrasado)}.` })
-    return list
-  }, [kpis, lotes, culturas, atraso])
+  const pagarHoje    = contasDia.filter(c => c.tipo === 'pagar')
+  const receberHoje  = contasDia.filter(c => c.tipo === 'receber')
+  const totalPagar   = pagarHoje.reduce((s, c) => s + Number(c.valor ?? 0), 0)
+  const totalReceber = receberHoje.reduce((s, c) => s + Number(c.valor ?? 0), 0)
 
-  // Resumo executivo
-  const resumoExec = useMemo(() => {
-    if (!receita) return 'Nenhuma venda registrada no período.'
-    const nLotes = lotes.filter(l => Number(l.receita_bruta) > 0).length
-    const cultDesc = cultComReceita.length === 1 ? `A cultura ${cultComReceita[0]?.cultura} representa 100% da receita.` : `${cultComReceita.length} culturas geraram receita no período.`
-    const custoDesc = custo === 0 ? 'Não há custos lançados.' : `Custos lançados: ${fmt(custo)}.`
-    return `No período, foram vendidas ${caixas.toLocaleString('pt-BR')} caixas em ${nLotes} lote(s), gerando ${fmt(receita)}. ${cultDesc} ${custoDesc}`
-  }, [kpis, lotes, culturas])
+  const agendaAtrasada = agenda.filter(a => a.urgencia === 'atrasado')
+  const agendaHoje     = agenda.filter(a => a.urgencia === 'hoje')
+  const agendaUrgente  = agenda.filter(a => a.urgencia === 'urgente')
+  const maxLucro       = Math.max(...lucroCultura.map(c => Math.abs(Number(c.lucro_total))), 1)
+  const totalLucroLotes = lotes.reduce((s, l) => s + Number(l.lucro_bruto ?? 0), 0)
 
   if (loading) return <div className="loading">Carregando painel...</div>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-      {/* CABEÇALHO + NAVEGAÇÃO */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      {/* NAVEGAÇÃO DE MESES */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <button className="btn btn-sm" onClick={() => setMesOffset(o => o - 1)}>←</button>
-        <div style={{ flex: 1, textAlign: 'center' }}>
-          <span style={{ fontWeight: 700, fontSize: 17, color: 'var(--green)' }}>{mesLabel}</span>
+        <div style={{ flex: 1, textAlign: 'center', fontWeight: 700, fontSize: 16, color: 'var(--green)' }}>
+          {mesLabel}
           {mesOffset === 0 && <span style={{ marginLeft: 8, fontSize: 11, background: 'var(--green-light)', color: 'var(--green)', borderRadius: 4, padding: '2px 7px', fontWeight: 600 }}>Mês atual</span>}
         </div>
         <button className="btn btn-sm" onClick={() => setMesOffset(o => Math.min(o + 1, 0))} disabled={mesOffset === 0}>→</button>
         {mesOffset !== 0 && <button className="btn btn-sm" onClick={() => setMesOffset(0)}>Hoje</button>}
       </div>
 
-      {/* KPI CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12 }}>
-        <KpiCard icon="💰" label="Receita" value={fmt(receita)} sub={`A receber: ${fmt(kpis?.total_a_receber)}`} color="var(--teal)" />
-        <KpiCard icon="💸" label="Custos" value={fmt(custo)} sub={`A pagar: ${fmt(kpis?.total_a_pagar)}`} color={custo > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
-        <KpiCard icon="📈" label="Lucro" value={fmt(lucro)} sub={`Margem: ${margem}%`} color={cor(lucro)} />
-        <KpiCard icon="📦" label="Caixas" value={caixas.toLocaleString('pt-BR')} sub="vendidas no período" color="var(--text)" />
-        <KpiCard icon="🏷️" label="Preço médio/cx" value={precoMed > 0 ? fmt(precoMed) : '—'} sub="receita ÷ caixas" color="var(--text)" />
-        <KpiCard icon="%" label="Margem" value={margem > 0 ? `${margem}%` : '—'} sub="lucro ÷ receita" color={Number(margem) >= 30 ? 'var(--green)' : Number(margem) > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
-      </div>
-
-      {/* ALERTAS */}
-      {alertas.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {alertas.map((a, i) => <Alert key={i} {...a} />)}
+      {/* ══════════════════════════════════════════════════════
+          BLOCO 1 — FINANCEIRO
+      ══════════════════════════════════════════════════════ */}
+      <Secao
+        icon="💰"
+        titulo="Financeiro"
+        cor={inadimplentes.length > 0 ? '#fca5a5' : 'var(--border)'}
+        badge={inadimplentes.length > 0 && (
+          <span style={{ fontSize: 11, background: '#fee2e2', color: '#991b1b', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>
+            🔴 {inadimplentes.length} inadimplente(s)
+          </span>
+        )}
+      >
+        {/* Saldo consolidado */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>Saldo consolidado</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <KpiMini label="Total" value={fmt(saldoConsolidado?.saldo_total)} color="var(--teal)" />
+            <KpiMini label="Bancos" value={fmt(saldoConsolidado?.saldo_bancos)} color="var(--text)" />
+            <KpiMini label="Caixa" value={fmt(saldoConsolidado?.saldo_caixa)} color="var(--text)" />
+          </div>
         </div>
-      )}
 
-      {/* RESUMO EXECUTIVO */}
-      {receita > 0 && (
-        <div style={{ background: 'var(--green-light)', border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', padding: '14px 18px' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '.5px', marginBottom: 6 }}>📋 Resumo executivo</div>
-          <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>{resumoExec}</div>
+        {/* KPIs do mês */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 6 }}>Desempenho — {mesLabel}</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <KpiMini label="Receita" value={fmt(receita)} color="var(--teal)" sub={`${caixas} caixas`} />
+            <KpiMini label="Custos" value={fmt(custo)} color={custo > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
+            <KpiMini label="Lucro" value={fmt(lucro)} color={cor(lucro)} sub={`Margem ${margem}%`} />
+            <KpiMini label="Preço médio/cx" value={precoMed > 0 ? fmt(precoMed) : '—'} color="var(--text)" />
+          </div>
         </div>
-      )}
 
-      {/* ALERTAS FINANCEIROS */}
-      {(atraso.length > 0 || vencer.length > 0 || receber.length > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-          {atraso.length > 0 && (
-            <div style={{ background: '#fff5f5', border: '1px solid var(--red-mid)', borderRadius: 'var(--radius)', padding: '12px 16px' }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--red)', marginBottom: 8 }}>🚨 {atraso.length} em atraso — {fmt(totalAtrasado)}</div>
-              {atraso.slice(0, 3).map(a => (
-                <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4, color: 'var(--text)' }}>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '65%' }}>{a.descricao ?? a.fornecedor}</span>
-                  <strong>{fmt(a.valor)}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-          {vencer.length > 0 && (
-            <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 'var(--radius)', padding: '12px 16px' }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 8 }}>⚠️ {vencer.length} vencem em 7 dias — {fmt(totalVencer)}</div>
-              {vencer.slice(0, 3).map(v => (
-                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                  <span>{fmtDate(v.data_vencimento)} · {v.lote}</span>
-                  <strong>{fmt(v.valor)}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-          {receber.length > 0 && (
-            <div style={{ background: '#f0fdf4', border: '1px solid var(--green-mid)', borderRadius: 'var(--radius)', padding: '12px 16px' }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--green)', marginBottom: 8 }}>💰 {receber.length} a receber — {fmt(receber.reduce((s,r)=>s+Number(r.valor_total??0),0))}</div>
-              {receber.slice(0, 3).map(r => (
-                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                  <span>{r.comprador?.substring(0, 20)}</span>
-                  <strong>{fmt(r.valor_total)}</strong>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* GRÁFICOS */}
-      {lotes.some(l => Number(l.receita_bruta) > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-          <GraficoBarras
-            title="Receita por lote"
-            labels={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>l.lote)}
-            data={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>Number(l.receita_bruta))}
-            color="rgba(29,158,117,.8)"
-          />
-          {cultComReceita.length > 1 && (
-            <GraficoBarras
-              title="Receita por cultura"
-              labels={cultComReceita.map(c=>c.cultura)}
-              data={cultComReceita.map(c=>Number(c.receita_total))}
-              color="rgba(59,130,246,.7)"
-            />
-          )}
-        </div>
-      )}
-
-      {/* RANKING LOTES */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 700, fontSize: 15 }}>🏆 Ranking por lucro</span>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{lotes.length} lotes</span>
-        </div>
-        {lotes.length === 0
-          ? <div className="empty">Sem dados ainda</div>
-          : <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr style={{ background: 'var(--bg)' }}>
-                    <th style={{ width: 28, textAlign: 'center' }}>#</th>
-                    <th>Lote</th>
-                    <th>Cultura</th>
-                    <th style={{ textAlign: 'right' }}>Caixas</th>
-                    <th style={{ textAlign: 'right' }}>Receita</th>
-                    <th style={{ textAlign: 'right' }}>Custo</th>
-                    <th style={{ textAlign: 'right' }}>Lucro</th>
-                    <th style={{ textAlign: 'right' }}>Preço/cx</th>
-                    <th style={{ textAlign: 'right' }}>Margem</th>
-                    <th style={{ textAlign: 'right' }}>Part. %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {[...lotes].sort((a, b) => Number(b.lucro_bruto) - Number(a.lucro_bruto)).map((l, i) => {
-                    const rec    = Number(l.receita_bruta)
-                    const cst    = Number(l.custo_total)
-                    const luc    = Number(l.lucro_bruto)
-                    const cx     = Number(l.total_caixas_produzidas)
-                    const mg     = rec > 0 ? (luc / rec * 100).toFixed(1) : 0
-                    const pm     = cx > 0 ? rec / cx : 0
-                    const part   = totalLucro > 0 ? (luc / totalLucro * 100).toFixed(1) : 0
-                    const corLuc = luc > 0 ? 'var(--green)' : luc < 0 ? 'var(--red)' : 'var(--text-muted)'
-                    const semMov = rec === 0
-                    return (
-                      <tr key={l.lote_id} style={{ opacity: semMov ? 0.45 : 1 }}>
-                        <td style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', fontWeight: 700 }}>{i + 1}</td>
-                        <td><strong>{l.lote}</strong></td>
-                        <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l.variedade ?? '—'}</td>
-                        <td style={{ textAlign: 'right', fontSize: 13 }}>{cx.toLocaleString('pt-BR')}</td>
-                        <td style={{ textAlign: 'right', color: 'var(--teal)', fontWeight: 600, fontSize: 13 }}>{fmt(rec)}</td>
-                        <td style={{ textAlign: 'right', color: 'var(--amber)', fontSize: 13 }}>{fmt(cst)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700, color: corLuc }}>{fmt(luc)}</td>
-                        <td style={{ textAlign: 'right', fontSize: 12, color: 'var(--text-muted)' }}>{pm > 0 ? fmt(pm) : '—'}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 600, color: Number(mg) >= 30 ? 'var(--green)' : 'var(--amber)', fontSize: 13 }}>{mg > 0 ? mg + '%' : '—'}</td>
-                        <td style={{ textAlign: 'right' }}>
-                          {luc > 0 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, justifyContent: 'flex-end' }}>
-                              <div style={{ width: 40, height: 6, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden' }}>
-                                <div style={{ width: Math.min(Number(part), 100) + '%', height: '100%', background: 'var(--green)', borderRadius: 3 }} />
-                              </div>
-                              <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 32 }}>{part}%</span>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>}
-      </div>
-
-      {/* RESUMO POR CULTURA */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontWeight: 700, fontSize: 15 }}>🌿 Resumo por cultura</span>
-        </div>
-        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {culturas.length === 0
-            ? <div className="empty">Nenhuma cultura cadastrada</div>
-            : culturas.map(c => {
-                const rec  = Number(c.receita_total)
-                const cst  = Number(c.custo_total)
-                const luc  = rec - cst
-                const ativo = rec > 0
-                const maxR = Math.max(...culturas.map(x => Number(x.receita_total)), 1)
-                return (
-                  <div key={c.cultura} style={{
-                    background: ativo ? 'var(--surface)' : 'var(--bg)',
-                    border: `1px solid ${ativo ? 'var(--border)' : 'transparent'}`,
-                    borderRadius: 8,
-                    padding: '12px 14px',
-                    opacity: ativo ? 1 : 0.5,
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: ativo ? 10 : 0 }}>
-                      <div>
-                        <span style={{ fontWeight: ativo ? 700 : 500, fontSize: 14, color: ativo ? 'var(--text)' : 'var(--text-muted)' }}>{c.cultura}</span>
-                        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)' }}>{c.qtd_lotes} lote(s) · {c.qtd_setores} setor(es)</span>
-                        {!ativo && <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>sem vendas</span>}
-                      </div>
-                      {ativo && (
-                        <div style={{ display: 'flex', gap: 20, flexShrink: 0 }}>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Caixas</div>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>{Number(c.total_caixas).toLocaleString('pt-BR')}</div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Receita</div>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--teal)' }}>{fmt(rec)}</div>
-                          </div>
-                          <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Lucro</div>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: cor(luc) }}>{fmt(luc)}</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {ativo && (
-                      <>
-                        <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-                          <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-                            <div style={{ width: Math.min(rec / maxR * 100, 100) + '%', height: '100%', background: 'linear-gradient(90deg, var(--teal), var(--green))', borderRadius: 4 }} />
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                          {pct(rec, culturas.reduce((s,x)=>s+Number(x.receita_total),0))} da receita total
-                        </div>
-                      </>
-                    )}
+        {/* Contas do dia */}
+        {contasDia.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 8 }}>📅 Contas de hoje</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: 12, color: '#92400e', fontWeight: 700, marginBottom: 4 }}>💸 Pagar — {fmt(totalPagar)}</div>
+                {pagarHoje.slice(0, 3).map(c => (
+                  <div key={c.id} style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{c.nome}</span>
+                    <strong>{fmt(c.valor)}</strong>
                   </div>
-                )
-              })}
-        </div>
-      </div>
-
-    </div>
-  )
-}
-
-// ─── GRÁFICO DE BARRAS HORIZONTAL ───────────────────────────
-function GraficoBarras({ title, labels, data, color }) {
-  const max = Math.max(...data, 1)
-  return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 18px' }}>
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>{title}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {labels.map((label, i) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ minWidth: 60, fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
-            <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 4, height: 20, overflow: 'hidden', position: 'relative' }}>
-              <div style={{
-                width: Math.min(data[i] / max * 100, 100) + '%',
-                height: '100%',
-                background: color,
-                borderRadius: 4,
-                transition: 'width .4s',
-                display: 'flex', alignItems: 'center', paddingLeft: 6,
-              }}>
-                <span style={{ fontSize: 10, color: 'white', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmt(data[i])}</span>
+                ))}
+              </div>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ fontSize: 12, color: '#166534', fontWeight: 700, marginBottom: 4 }}>💰 Receber — {fmt(totalReceber)}</div>
+                {receberHoje.slice(0, 3).map(c => (
+                  <div key={c.id} style={{ fontSize: 12, display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '60%' }}>{c.contraparte}</span>
+                    <strong>{fmt(c.valor)}</strong>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
-        ))}
-      </div>
+        )}
+
+        {/* Inadimplência */}
+        {inadimplentes.length > 0 && (
+          <div>
+            <div style={{ fontSize: 11, color: '#991b1b', fontWeight: 700, textTransform: 'uppercase', marginBottom: 8 }}>🚨 Inadimplência</div>
+            {inadimplentes.map(i => (
+              <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)', gap: 8 }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{i.comprador}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{i.lote} · venceu {fmtDate(i.data_vencimento)}</div>
+                </div>
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--red)' }}>{fmt(i.valor_total)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--red)' }}>{i.dias_atraso}d atraso</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Secao>
+
+      {/* ══════════════════════════════════════════════════════
+          BLOCO 2 — PRODUTIVIDADE POR CULTURA
+      ══════════════════════════════════════════════════════ */}
+      <Secao icon="📊" titulo="Produtividade por Cultura">
+        {lucroCultura.length === 0
+          ? <div className="empty">Nenhuma cultura cadastrada</div>
+          : (
+            <>
+              {lucroCultura.map(c => {
+                const rec  = Number(c.receita_total)
+                const luc  = Number(c.lucro_total)
+                const cst  = Number(c.custo_total)
+                const area = Number(c.area_total_ha)
+                const lucHa = area > 0 ? luc / area : 0
+                const ativo = rec > 0
+                return (
+                  <div key={c.cultura_id} style={{ marginBottom: 14, opacity: ativo ? 1 : 0.45 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 20 }}>{c.icone}</span>
+                        <div>
+                          <span style={{ fontWeight: 700, fontSize: 14 }}>{c.cultura}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{c.qtd_lotes} lote(s) · {area.toFixed(1)} ha</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 16, flexShrink: 0 }}>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Lucro/ha</div>
+                          <div style={{ fontWeight: 700, fontSize: 13, color: cor(lucHa) }}>{area > 0 ? fmt(lucHa) : '—'}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Lucro total</div>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: cor(luc) }}>{fmt(luc)}</div>
+                        </div>
+                      </div>
+                    </div>
+                    {ativo && (
+                      <BarraH
+                        value={rec}
+                        max={Math.max(...lucroCultura.map(x => Number(x.receita_total)), 1)}
+                        color={luc >= 0 ? 'linear-gradient(90deg, var(--teal), var(--green))' : 'var(--red)'}
+                        label=""
+                        sub={`${pct(rec, lucroCultura.reduce((s,x)=>s+Number(x.receita_total),0))} receita`}
+                      />
+                    )}
+                    {!ativo && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic' }}>Sem vendas registradas</div>}
+                  </div>
+                )
+              })}
+
+              {/* Ranking de lotes */}
+              {lotes.length > 0 && (
+                <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', marginBottom: 10 }}>🏆 Ranking de lotes</div>
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr style={{ background: 'var(--bg)' }}>
+                          <th style={{ width: 24 }}>#</th>
+                          <th>Lote</th>
+                          <th style={{ textAlign: 'right' }}>Receita</th>
+                          <th style={{ textAlign: 'right' }}>Lucro</th>
+                          <th style={{ textAlign: 'right' }}>Margem</th>
+                          <th style={{ width: 80 }}>Part.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[...lotes].sort((a,b)=>Number(b.lucro_bruto)-Number(a.lucro_bruto)).map((l,i) => {
+                          const rec = Number(l.receita_bruta)
+                          const luc = Number(l.lucro_bruto)
+                          const mg  = rec > 0 ? (luc/rec*100).toFixed(1) : 0
+                          const part = totalLucroLotes > 0 ? (luc/totalLucroLotes*100).toFixed(1) : 0
+                          return (
+                            <tr key={l.lote_id} style={{ opacity: rec === 0 ? 0.4 : 1 }}>
+                              <td style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>{i+1}</td>
+                              <td><strong>{l.lote}</strong></td>
+                              <td style={{ textAlign: 'right', color: 'var(--teal)', fontWeight: 600, fontSize: 13 }}>{fmt(rec)}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 700, color: cor(luc) }}>{fmt(luc)}</td>
+                              <td style={{ textAlign: 'right', fontWeight: 600, fontSize: 12, color: Number(mg) >= 30 ? 'var(--green)' : 'var(--amber)' }}>{mg > 0 ? mg+'%' : '—'}</td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                  <div style={{ flex: 1, height: 6, background: 'var(--bg)', borderRadius: 3, overflow: 'hidden' }}>
+                                    <div style={{ width: Math.min(Number(part),100)+'%', height: '100%', background: 'var(--green)', borderRadius: 3 }} />
+                                  </div>
+                                  <span style={{ fontSize: 10, color: 'var(--text-muted)', minWidth: 28 }}>{part}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+      </Secao>
+
+      {/* ══════════════════════════════════════════════════════
+          BLOCO 3 — AGENDA DO CAMPO
+      ══════════════════════════════════════════════════════ */}
+      <Secao
+        icon="🌾"
+        titulo="Agenda do Campo — Próximos 15 dias"
+        cor={agendaAtrasada.length > 0 ? '#fca5a5' : agendaHoje.length > 0 ? '#fde68a' : 'var(--border)'}
+        badge={
+          agendaAtrasada.length > 0
+            ? <span style={{ fontSize: 11, background: '#fee2e2', color: '#991b1b', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>🔴 {agendaAtrasada.length} atrasada(s)</span>
+            : agendaHoje.length > 0
+            ? <span style={{ fontSize: 11, background: '#fef3c7', color: '#92400e', borderRadius: 4, padding: '2px 8px', fontWeight: 600 }}>🟡 {agendaHoje.length} para hoje</span>
+            : null
+        }
+      >
+        {agenda.length === 0
+          ? <div className="empty">Nenhuma atividade programada para os próximos 15 dias</div>
+          : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {agenda.map(a => (
+                <div key={a.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+                  padding: '8px 12px', borderRadius: 8,
+                  background: a.urgencia === 'atrasado' ? '#fff5f5' : a.urgencia === 'hoje' ? '#fffbeb' : 'var(--bg)',
+                  border: `1px solid ${a.urgencia === 'atrasado' ? '#fca5a5' : a.urgencia === 'hoje' ? '#fde68a' : 'var(--border)'}`,
+                }}>
+                  <StatusBadge status={a.urgencia} />
+                  <div style={{ flex: 1, minWidth: 100 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{a.cultura_icone} {a.tipo_atividade}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.lote}{a.setor ? ` · ${a.setor}` : ''}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{fmtDate(a.proxima_execucao)}</div>
+                    {a.dias_atraso > 0 && <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>{a.dias_atraso}d atraso</div>}
+                    {a.frequencia_dias && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>A cada {a.frequencia_dias}d</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+      </Secao>
+
     </div>
   )
 }
