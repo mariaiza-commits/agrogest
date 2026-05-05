@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, statusBadge, today, BtnExportar } from '../lib/utils'
 
-const EMPTY = { carga_id:'', comprador:'', comprador_novo:'', usando_novo_comprador:false, quantidade_primeira:'', quantidade_segunda:'', preco_primeira:'', preco_segunda:'', forma_pagamento:'a_vista', dias_prazo:'', data_vencimento:'', conta_vista_id:'', observacoes:'' }
+const EMPTY = { carga_id:'', client_id:'', comprador:'', comprador_novo:'', usando_novo_comprador:false, quantidade_primeira:'', quantidade_segunda:'', preco_primeira:'', preco_segunda:'', forma_pagamento:'a_vista', dias_prazo:'', data_vencimento:'', conta_vista_id:'', observacoes:'' }
 
 const COLS_EXPORT = [
   { label:'Data', accessor: r => fmtDate(r.data_venda) },
@@ -41,16 +41,15 @@ export default function Vendas({ onAddBtn }) {
 
   async function load() {
     setLoading(true)
-    const [{ data: cs }, { data: vs }, { data: cfs }, { data: rc }] = await Promise.all([
+    const [{ data: cs }, { data: vs }, { data: cfs }] = await Promise.all([
       supabase.from('vw_resumo_cargas').select('*').order('data', { ascending: false }),
       supabase.from('vendas').select('*,cargas(data)').order('data_venda',{ascending:false}).limit(100),
       supabase.from('contas_financeiras').select('id,nome,tipo,saldo_atual').eq('ativo',true).order('nome'),
-      supabase.from('producao').select('responsavel').not('responsavel','is',null),
     ])
     setCargas(cs??[]); setVendas(vs??[]); setContas(cfs??[])
-    const compsVendas = (vs??[]).map(v=>v.comprador).filter(Boolean)
-    const resps = (rc??[]).map(p=>p.responsavel).filter(Boolean)
-    setCompradores([...new Set([...compsVendas,...resps])].sort())
+    // Carrega clientes cadastrados
+    const { data: clientes } = await supabase.from('clients').select('id,nome').is('deleted_at',null).order('nome')
+    setCompradores(clientes ?? [])
     setLoading(false)
   }
 
@@ -119,6 +118,7 @@ export default function Vendas({ onAddBtn }) {
     const total = valorTotal ?? 0
     const payload = {
       carga_id: form.carga_id, comprador: compradorFinal,
+      client_id: form.client_id || null,
       quantidade_primeira: parseInt(form.quantidade_primeira)||0,
       quantidade_segunda: parseInt(form.quantidade_segunda)||0,
       preco_primeira: parseFloat(form.preco_primeira)||0,
@@ -257,15 +257,18 @@ export default function Vendas({ onAddBtn }) {
               <div className="form-group form-full"><label>Comprador *</label>
                 {!form.usando_novo_comprador
                   ? <div style={{display:'flex',gap:8}}>
-                      <select value={form.comprador} onChange={e=>setForm(f=>({...f,comprador:e.target.value}))} style={{flex:1}}>
-                        <option value="">— Selecione —</option>
-                        {compradores.map(c=><option key={c} value={c}>{c}</option>)}
+                      <select value={form.client_id} onChange={e=>{
+                        const sel = compradores.find(c=>c.id===e.target.value)
+                        setForm(f=>({...f,client_id:e.target.value,comprador:sel?.nome??''}))
+                      }} style={{flex:1}}>
+                        <option value="">— Selecione o cliente —</option>
+                        {compradores.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
                       </select>
-                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_comprador:true,comprador:''}))}>+ Novo</button>
+                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_comprador:true,client_id:'',comprador:''}))}>+ Novo</button>
                     </div>
                   : <div style={{display:'flex',gap:8}}>
                       <input autoFocus value={form.comprador_novo} onChange={e=>setForm(f=>({...f,comprador_novo:e.target.value}))} placeholder="Nome ou empresa" style={{flex:1}} />
-                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_comprador:false,comprador_novo:''}))}>← Lista</button>
+                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_comprador:false,comprador_novo:'',client_id:''}))}>← Lista</button>
                     </div>}
               </div>
               <div className="form-group"><label>Qtd 1ª (cx)</label><input type="number" inputMode="numeric" value={form.quantidade_primeira} onChange={e=>setForm(f=>({...f,quantidade_primeira:e.target.value}))} /></div>

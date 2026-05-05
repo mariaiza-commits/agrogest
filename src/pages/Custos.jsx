@@ -55,8 +55,8 @@ export default function Custos({ onAddBtn }) {
     ])
     lotesRef.current = ls??[]
     setLotes(ls??[]); setCustos(cs??[]); setCategorias(cats??[]); setContas(cfs??[])
-    const forns = [...new Set((cs??[]).map(c=>c.fornecedor).filter(Boolean))].sort()
-    setFornecedores(forns)
+    const forns_res = await supabase.from('suppliers').select('id,nome,categoria').is('deleted_at',null).order('nome')
+    setFornecedores(forns_res.data ?? [])
     setSelecionados([])
     setLoading(false)
   }
@@ -300,11 +300,14 @@ export default function Custos({ onAddBtn }) {
               <div className="form-group form-full"><label>Fornecedor *</label>
                 {!form.usando_novo_forn
                   ? <div style={{display:'flex',gap:8}}>
-                      <select value={form.fornecedor} onChange={e=>setForm(f=>({...f,fornecedor:e.target.value}))} style={{flex:1}}>
+                      <select value={form.fornecedor} onChange={e=>{
+                        const sel=fornecedores.find(f=>f.id===e.target.value)
+                        setForm(f=>({...f,fornecedor:sel?.nome??e.target.value,supplier_id:e.target.value}))
+                      }} style={{flex:1}}>
                         <option value="">— Selecione —</option>
-                        {fornecedores.map(f=><option key={f} value={f}>{f}</option>)}
+                        {fornecedores.map(f=><option key={f.id} value={f.id}>{f.nome}</option>)}
                       </select>
-                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_forn:true,fornecedor:''}))}>+ Novo</button>
+                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_forn:true,fornecedor:'',supplier_id:''}))}>+ Novo</button>
                     </div>
                   : <div style={{display:'flex',gap:8}}>
                       <input autoFocus value={form.fornecedor_novo} onChange={e=>setForm(f=>({...f,fornecedor_novo:e.target.value}))} placeholder="Nome do fornecedor" style={{flex:1}} />

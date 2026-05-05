@@ -9,6 +9,8 @@ import Financeiro   from './pages/Financeiro'
 import Estoque      from './pages/Estoque'
 import Atividades   from './pages/Atividades'
 import Programacao  from './pages/Programacao'
+import Clientes     from './pages/Clientes'
+import Fornecedores from './pages/Fornecedores'
 
 // ─── ESTRUTURA DE MÓDULOS ────────────────────────────────────
 const MODULOS = [
@@ -25,7 +27,15 @@ const MODULOS = [
     ]
   },
   {
-    id: 'financeiro',
+    id: 'relacionamentos',
+    label: 'Relacionamentos',
+    icon: '🤝',
+    pages: [
+      { key: 'clientes',     label: 'Clientes',     icon: '👥', add: '+ Novo cliente' },
+      { key: 'fornecedores', label: 'Fornecedores',  icon: '🏭', add: '+ Novo fornecedor' },
+    ]
+  },
+  {
     label: 'Gestão do Dinheiro',
     icon: '💰',
     pages: [
@@ -133,15 +143,17 @@ export default function App() {
         </div>
 
         <div className="content">
-          {page === 'dashboard'   && <Dashboard />}
-          {page === 'lotes'       && <Lotes       onAddBtn={registerAddBtn} />}
-          {page === 'producao'    && <Producao     onAddBtn={registerAddBtn} />}
-          {page === 'vendas'      && <Vendas       onAddBtn={registerAddBtn} />}
-          {page === 'custos'      && <Custos       onAddBtn={registerAddBtn} />}
-          {page === 'financeiro'  && <Financeiro />}
-          {page === 'estoque'     && <Estoque      onAddBtn={registerAddBtn} />}
-          {page === 'atividades'  && <Atividades   onAddBtn={registerAddBtn} />}
-          {page === 'programacao' && <Programacao  onAddBtn={registerAddBtn} />}
+          {page === 'dashboard'    && <Dashboard />}
+          {page === 'lotes'        && <Lotes       onAddBtn={registerAddBtn} />}
+          {page === 'producao'     && <Producao     onAddBtn={registerAddBtn} />}
+          {page === 'vendas'       && <Vendas       onAddBtn={registerAddBtn} />}
+          {page === 'custos'       && <Custos       onAddBtn={registerAddBtn} />}
+          {page === 'financeiro'   && <Financeiro />}
+          {page === 'estoque'      && <Estoque      onAddBtn={registerAddBtn} />}
+          {page === 'atividades'   && <Atividades   onAddBtn={registerAddBtn} />}
+          {page === 'programacao'  && <Programacao  onAddBtn={registerAddBtn} />}
+          {page === 'clientes'     && <Clientes     onAddBtn={registerAddBtn} />}
+          {page === 'fornecedores' && <Fornecedores onAddBtn={registerAddBtn} />}
         </div>
       </div>
     </div>
