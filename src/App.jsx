@@ -11,6 +11,7 @@ import Atividades   from './pages/Atividades'
 import Programacao  from './pages/Programacao'
 import Clientes     from './pages/Clientes'
 import Fornecedores from './pages/Fornecedores'
+import Culturas     from './pages/Culturas'
 
 // ─── ESTRUTURA DE MÓDULOS ────────────────────────────────────
 const MODULOS = [
@@ -20,6 +21,7 @@ const MODULOS = [
     icon: '🌿',
     pages: [
       { key: 'lotes',       label: 'Lotes / Piquetes', icon: '◫', add: '+ Novo lote' },
+      { key: 'culturas',    label: 'Culturas',          icon: '🌿', add: '+ Nova cultura' },
       { key: 'producao',    label: 'Produção',          icon: '📦', add: '+ Nova carga' },
       { key: 'atividades',  label: 'Atividades',        icon: '🛠️', add: '+ Nova atividade' },
       { key: 'programacao', label: 'Programação',       icon: '📅', add: '+ Nova programação' },
@@ -152,6 +154,7 @@ export default function App() {
           {page === 'estoque'      && <Estoque      onAddBtn={registerAddBtn} />}
           {page === 'atividades'   && <Atividades   onAddBtn={registerAddBtn} />}
           {page === 'programacao'  && <Programacao  onAddBtn={registerAddBtn} />}
+          {page === 'culturas'     && <Culturas     onAddBtn={registerAddBtn} />}
           {page === 'clientes'     && <Clientes     onAddBtn={registerAddBtn} />}
           {page === 'fornecedores' && <Fornecedores onAddBtn={registerAddBtn} />}
         </div>

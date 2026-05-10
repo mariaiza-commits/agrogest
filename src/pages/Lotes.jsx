@@ -2,15 +2,15 @@ import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, statusLoteBadge } from '../lib/utils'
 
-const VARIEDADES = ['Prata Anã','Nanica','Prata','Cavendish','Terra','Outra']
 const ESTAGIOS   = [{ value:'jovem', label:'🌱 Jovem' },{ value:'producao', label:'🍌 Produção' },{ value:'final', label:'🍂 Final' }]
 const EMPTY_LOTE = { nome:'', area_ha:'', status:'ativo', observacoes:'' }
-const EMPTY_SETOR = (n) => ({ nome:`Setor ${n}`, cultura:'Prata Anã', estagio:'producao', area_hectares:'', data_plantio:'' })
+const EMPTY_SETOR = (n) => ({ nome:`Setor ${n}`, cultura:'', variedade:'', estagio:'producao', area_hectares:'', data_plantio:'' })
 
 export default function Lotes({ onAddBtn }) {
   const [lotes, setLotes]         = useState([])
   const [resumo, setResumo]       = useState({})
   const [setores, setSetores]     = useState({})
+  const [culturasDB, setCulturasDB] = useState([])
   const [loading, setLoading]     = useState(true)
   const [modal, setModal]         = useState(false)
   const [modalDetalhe, setModalDetalhe] = useState(null)
@@ -29,14 +29,16 @@ export default function Lotes({ onAddBtn }) {
 
   async function load() {
     setLoading(true)
-    const [{ data: ls }, { data: rs }, { data: sts }] = await Promise.all([
+    const [{ data: ls }, { data: rs }, { data: sts }, { data: cults }] = await Promise.all([
       supabase.from('lotes').select('*').order('nome'),
       supabase.from('vw_resumo_por_lote').select('*'),
       supabase.from('setores').select('*').order('nome'),
+      supabase.from('culturas').select('id,nome,icone,tipo,unidade_producao').eq('ativo',true).is('deleted_at',null).order('nome'),
     ])
     setLotes(ls??[])
     const m = {}; (rs??[]).forEach(r => { m[r.lote_id] = r }); setResumo(m)
     const s = {}; (sts??[]).forEach(st => { if (!s[st.lote_id]) s[st.lote_id]=[]; s[st.lote_id].push(st) }); setSetores(s)
+    setCulturasDB(cults??[])
     setLoading(false)
   }
 
@@ -79,7 +81,7 @@ export default function Lotes({ onAddBtn }) {
       setForm({ nome:lote.nome, area_ha:lote.area_ha??'', status:lote.status, observacoes:lote.observacoes??'' })
       setEditId(lote.id)
       const { data: sts } = await supabase.from('setores').select('*').eq('lote_id', lote.id).order('nome')
-      if (sts?.length) setFormSetores(sts.map(s => ({ id:s.id, nome:s.nome, cultura:s.cultura??'Prata Anã', estagio:s.estagio??'producao', area_hectares:s.area_hectares??'', data_plantio:s.data_plantio??'' })))
+      if (sts?.length) setFormSetores(sts.map(s => ({ id:s.id, nome:s.nome, cultura:s.cultura??'', variedade:s.variedade??'', estagio:s.estagio??'producao', area_hectares:s.area_hectares??'', data_plantio:s.data_plantio??'' })))
       else setFormSetores([EMPTY_SETOR(1)])
     } else {
       setForm(EMPTY_LOTE); setFormSetores([EMPTY_SETOR(1)]); setEditId(null)
@@ -101,13 +103,13 @@ export default function Lotes({ onAddBtn }) {
     }
     if (editId) {
       for (const s of formSetores) {
-        if (s.id) await supabase.from('setores').update({ nome:s.nome, cultura:s.cultura, estagio:s.estagio, area_hectares:s.area_hectares||null, data_plantio:s.data_plantio||null }).eq('id', s.id)
-        else await supabase.from('setores').insert({ lote_id:loteId, nome:s.nome, cultura:s.cultura, estagio:s.estagio, area_hectares:s.area_hectares||null, data_plantio:s.data_plantio||null })
+        if (s.id) await supabase.from('setores').update({ nome:s.nome, cultura:s.cultura, variedade:s.variedade||null, estagio:s.estagio, area_hectares:s.area_hectares||null, data_plantio:s.data_plantio||null }).eq('id', s.id)
+        else await supabase.from('setores').insert({ lote_id:loteId, nome:s.nome, cultura:s.cultura, variedade:s.variedade||null, estagio:s.estagio, area_hectares:s.area_hectares||null, data_plantio:s.data_plantio||null })
       }
       const idsAtuais = formSetores.filter(s=>s.id).map(s=>s.id)
       if (idsAtuais.length) await supabase.from('setores').delete().eq('lote_id', loteId).not('id', 'in', `(${idsAtuais.join(',')})`)
     } else {
-      await supabase.from('setores').insert(formSetores.map(s => ({ lote_id:loteId, nome:s.nome, cultura:s.cultura, estagio:s.estagio, area_hectares:s.area_hectares||null, data_plantio:s.data_plantio||null })))
+      await supabase.from('setores').insert(formSetores.map(s => ({ lote_id:loteId, nome:s.nome, cultura:s.cultura, variedade:s.variedade||null, estagio:s.estagio, area_hectares:s.area_hectares||null, data_plantio:s.data_plantio||null })))
     }
     setSaving(false); setModal(false); load()
   }
@@ -353,15 +355,20 @@ export default function Lotes({ onAddBtn }) {
                     <input value={s.nome} onChange={e=>updateSetor(idx,'nome',e.target.value)} placeholder={`Setor ${idx+1}`} />
                   </div>
                   <div className="form-group" style={{ marginBottom:0, flex:2, minWidth:120 }}><label>Cultura</label>
-                    <select value={VARIEDADES.includes(s.cultura) ? s.cultura : 'Outra'} onChange={e=>{
-                      if (e.target.value !== 'Outra') updateSetor(idx,'cultura',e.target.value)
+                    <select value={culturasDB.some(c=>c.nome===s.cultura) ? s.cultura : '__outra'} onChange={e=>{
+                      if (e.target.value !== '__outra') updateSetor(idx,'cultura',e.target.value)
                       else updateSetor(idx,'cultura','')
                     }}>
-                      {VARIEDADES.map(v=><option key={v}>{v}</option>)}
+                      <option value="">— Selecione —</option>
+                      {culturasDB.map(c=><option key={c.id} value={c.nome}>{c.icone} {c.nome}</option>)}
+                      <option value="__outra">Outra...</option>
                     </select>
-                    {!VARIEDADES.slice(0,-1).includes(s.cultura) && (
+                    {!culturasDB.some(c=>c.nome===s.cultura) && s.cultura !== '' && (
                       <input style={{marginTop:4}} value={s.cultura} onChange={e=>updateSetor(idx,'cultura',e.target.value)} placeholder="Digite a cultura" />
                     )}
+                  </div>
+                  <div className="form-group" style={{ marginBottom:0, flex:2, minWidth:120 }}><label>Variedade</label>
+                    <input value={s.variedade} onChange={e=>updateSetor(idx,'variedade',e.target.value)} placeholder={s.cultura ? `ex: Nanica, Prata Anã...` : 'Selecione a cultura'} disabled={!s.cultura} />
                   </div>
                   <div className="form-group" style={{ marginBottom:0, flex:2, minWidth:120 }}><label>Estágio</label>
                     <select value={s.estagio} onChange={e=>updateSetor(idx,'estagio',e.target.value)}>
