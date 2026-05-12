@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtDate, today } from '../lib/utils'
 
@@ -16,6 +16,7 @@ export default function Programacao({ onAddBtn }) {
   const [form, setForm]       = useState(EMPTY)
   const [editId, setEditId]   = useState(null)
   const [saving, setSaving]   = useState(false)
+  const [viewMode, setViewMode] = useState('calendario') // calendario | lista
   const lotesRef = React.useRef([])
 
   useEffect(() => { load() }, [])
@@ -73,8 +74,33 @@ export default function Programacao({ onAddBtn }) {
 
   if (loading) return <div className="loading">Carregando programação...</div>
 
+  // Calendário: monta grade de 30 dias
+  const hoje = new Date()
+  const diasCalendario = Array.from({length:35}, (_,i) => {
+    const d = new Date(hoje)
+    d.setDate(hoje.getDate() - hoje.getDay() + i)
+    return d
+  })
+  const atividadesPorDia = {}
+  programas.forEach(p => {
+    if (!p.proxima_execucao || !p.ativo) return
+    const k = p.proxima_execucao.split('T')[0]
+    if (!atividadesPorDia[k]) atividadesPorDia[k] = []
+    atividadesPorDia[k].push(p)
+  })
+  const corTipo = {
+    'Adubação':'var(--green)', 'Irrigação':'var(--teal)', 'Pulverização':'var(--amber)',
+    'Colheita':'var(--red)', 'Capina':'#8b5cf6', 'Poda':'#ec4899',
+  }
+
   return (
     <>
+      {/* Botões de visualização */}
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginBottom:12}}>
+        <button className="btn btn-sm" style={{background:viewMode==='calendario'?'var(--green)':'',color:viewMode==='calendario'?'white':''}} onClick={()=>setViewMode('calendario')}>📅 Calendário</button>
+        <button className="btn btn-sm" style={{background:viewMode==='lista'?'var(--green)':'',color:viewMode==='lista'?'white':''}} onClick={()=>setViewMode('lista')}>☰ Lista</button>
+      </div>
+
       {alertas.length > 0 && (
         <div style={{marginBottom:14}}>
           {alertas.map(a=>(
@@ -95,11 +121,66 @@ export default function Programacao({ onAddBtn }) {
         </div>
       )}
 
-      {programas.length === 0
-        ? <div className="empty">Nenhuma programação cadastrada.<br/>Clique em "+ Nova programação".</div>
-        : <div className="card">
-            <div className="table-wrap">
-              <table>
+      {/* CALENDÁRIO */}
+      {viewMode==='calendario' && (
+        <div className="card">
+          {/* Header dias semana */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:4}}>
+            {['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>(
+              <div key={d} style={{textAlign:'center',fontSize:11,fontWeight:700,color:'var(--text-muted)',padding:'4px 0'}}>{d}</div>
+            ))}
+          </div>
+          {/* Grade */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2}}>
+            {diasCalendario.map((dia,i) => {
+              const key = dia.toISOString().split('T')[0]
+              const ativs = atividadesPorDia[key] ?? []
+              const isHoje = key === hoje.toISOString().split('T')[0]
+              const isMesAtual = dia.getMonth() === hoje.getMonth()
+              return (
+                <div key={i} style={{
+                  minHeight:64, background:isHoje?'var(--green-light)':isMesAtual?'var(--surface)':'var(--bg)',
+                  border:`1px solid ${isHoje?'var(--green)':'var(--border)'}`,
+                  borderRadius:6, padding:'4px 6px', opacity:isMesAtual?1:.5
+                }}>
+                  <div style={{fontSize:11,fontWeight:isHoje?700:400,color:isHoje?'var(--green)':'var(--text-muted)',marginBottom:3}}>
+                    {dia.getDate()}{isHoje&&' •'}
+                  </div>
+                  {ativs.slice(0,3).map((a,j) => (
+                    <div key={j} title={`${a.tipo_atividade} — ${a.lotes?.nome}`} style={{
+                      fontSize:9, fontWeight:600, color:'white', borderRadius:3,
+                      background:corTipo[a.tipo_atividade]??'var(--teal)',
+                      padding:'1px 4px', marginBottom:2, overflow:'hidden',
+                      textOverflow:'ellipsis', whiteSpace:'nowrap'
+                    }}>
+                      {tipoIcon[a.tipo_atividade]??'📝'} {a.tipo_atividade}
+                    </div>
+                  ))}
+                  {ativs.length > 3 && <div style={{fontSize:9,color:'var(--text-muted)'}}>+{ativs.length-3}</div>}
+                </div>
+              )
+            })}
+          </div>
+          {/* Legenda */}
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:12,paddingTop:10,borderTop:'1px solid var(--border)'}}>
+            {Object.entries(corTipo).map(([tipo,cor])=>(
+              <span key={tipo} style={{fontSize:11,display:'flex',alignItems:'center',gap:4}}>
+                <span style={{width:10,height:10,background:cor,borderRadius:2,display:'inline-block'}}/>
+                {tipo}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* LISTA */}
+      {viewMode==='lista' && (
+        <>
+          {programas.length === 0
+            ? <div className="empty">Nenhuma programação cadastrada.<br/>Clique em "+ Nova programação".</div>
+            : <div className="card">
+                <div className="table-wrap">
+                  <table>
                 <thead><tr><th>Lote</th><th>Setor</th><th>Atividade</th><th>Insumo</th><th>Frequência</th><th>Próxima execução</th><th>Status</th><th>Ativo</th><th></th></tr></thead>
                 <tbody>
                   {programas.map(p=>{
@@ -132,6 +213,8 @@ export default function Programacao({ onAddBtn }) {
               </table>
             </div>
           </div>}
+        </>
+      )}
 
       <button className="fab" onClick={()=>openModal()}>+</button>
 

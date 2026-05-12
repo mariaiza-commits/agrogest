@@ -1,43 +1,49 @@
-# BananaGest — Sistema de Gestão de Plantio de Banana
+# 🌿 AgroGestão
 
-## Como rodar localmente
+Sistema de gestão rural multi-cultura — Jaíba · MG
+
+## 📋 Sobre
+
+O AgroGestão é uma plataforma completa de gestão agrícola e financeira para produtores rurais, suportando múltiplas culturas (banana, gado, café, milho, etc.).
+
+## 🚀 Tecnologias
+
+- **Frontend:** React 18
+- **Banco:** Supabase (PostgreSQL)
+- **Deploy:** Vercel
+
+## ⚙️ Instalação
 
 ```bash
-# 1. Instalar dependências
+git clone https://github.com/mariaiza-commits/bananagest.git
+cd bananagest
 npm install
-
-# 2. Rodar em desenvolvimento
+cp .env.example .env   # Configure suas credenciais
 npm start
-# Abre em http://localhost:3000
 ```
 
-## Como publicar na Vercel (grátis)
+## 🔑 Variáveis de ambiente
 
-1. Crie conta em https://vercel.com (pode entrar com GitHub)
-2. Instale a CLI: `npm install -g vercel`
-3. Na pasta do projeto, rode: `vercel`
-4. Siga as instruções — em 2 minutos o sistema estará no ar com URL pública
+```
+REACT_APP_SUPABASE_URL=https://SEU_PROJETO.supabase.co
+REACT_APP_SUPABASE_KEY=sua_chave_anon_aqui
+```
 
-## Estrutura do projeto
+> ⚠️ Nunca commite o `.env` com chaves reais.
+
+## 📁 Estrutura
 
 ```
 src/
-  lib/
-    supabase.js   ← conexão com o banco
-    utils.js      ← formatação de moeda, datas, badges
-  pages/
-    Dashboard.jsx ← KPIs e gráficos
-    Lotes.jsx     ← CRUD de talhões
-    Producao.jsx  ← registro de colheitas
-    Vendas.jsx    ← registro de vendas
-    Custos.jsx    ← registro de custos
-    Financeiro.jsx← contas a receber / pagar
-  App.jsx         ← navegação e layout
-  index.css       ← estilos globais
+├── components/  → UI reutilizável
+├── hooks/       → Lógica de dados
+├── lib/         → supabase.js, utils.js
+└── pages/       → Dashboard, Lotes, Vendas, etc.
 ```
 
-## Banco de dados
+## 🗺️ Roadmap
 
-Supabase: https://juqvvdnybhwelctlhdlr.supabase.co
-
-Todas as tabelas, views e funções foram criadas via script SQL.
+- [ ] Supabase Auth multi-usuário
+- [ ] Modo offline
+- [ ] App mobile nativo
+- [ ] Multi-tenant SaaS

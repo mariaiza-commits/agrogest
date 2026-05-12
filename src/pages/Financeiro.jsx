@@ -113,6 +113,7 @@ export default function Financeiro() {
   const [contas,setContas]   = useState([])
   const [fluxo,setFluxo]     = useState([])
   const [projetado,setProj]  = useState(null)
+  const [fluxoProj,setFluxoProj] = useState([])
   const [receber,setRec]     = useState([])
   const [pagar,setPag]       = useState([])
   const [loading,setLoad]    = useState(true)
@@ -136,15 +137,16 @@ export default function Financeiro() {
   const load = useCallback(async()=>{
     setLoad(true)
     try {
-      const [{data:cs},{data:fl},{data:pj},{data:r},{data:p}] = await Promise.all([
+      const [{data:cs},{data:fl},{data:pj},{data:r},{data:p},{data:fp}] = await Promise.all([
         supabase.from('vw_saldo_contas').select('*'),
         supabase.from('vw_fluxo_caixa').select('*').limit(200),
         supabase.from('vw_saldo_projetado').select('*').single(),
         supabase.from('vw_receber_por_comprador').select('*'),
         supabase.from('vw_pagar_por_fornecedor').select('*'),
+        supabase.from('vw_fluxo_projetado').select('*'),
       ])
       setContas(cs??[]); setFluxo(fl??[]); setProj(pj)
-      setRec(r??[]); setPag(p??[])
+      setRec(r??[]); setPag(p??[]); setFluxoProj(fp??[])
     } catch(e){ console.error(e) }
     setLoad(false)
   },[])
@@ -241,7 +243,8 @@ export default function Financeiro() {
 
       <div className="tabs">
         <button className={`tab ${aba==='contas'?'active':''}`} onClick={()=>setAba('contas')}>🏦 Contas</button>
-        <button className={`tab ${aba==='fluxo'?'active':''}`} onClick={()=>setAba('fluxo')}>📊 Fluxo de caixa</button>
+        <button className={`tab ${aba==='fluxo'?'active':''}`} onClick={()=>setAba('fluxo')}>📊 Fluxo</button>
+        <button className={`tab ${aba==='projecao'?'active':''}`} onClick={()=>setAba('projecao')}>📆 Projeção 30d</button>
         <button className={`tab ${aba==='pendencias'?'active':''}`} onClick={()=>setAba('pendencias')}>⏳ Pendências</button>
         <button className={`tab ${aba==='transferencia'?'active':''}`} onClick={()=>setAba('transferencia')}>🔄 Transferência</button>
       </div>
@@ -323,6 +326,51 @@ export default function Financeiro() {
                 </div>
               </div>}
         </>
+      )}
+
+      {/* ABA: PROJEÇÃO 30 DIAS */}
+      {aba==='projecao'&&(
+        <div style={{display:'flex',flexDirection:'column',gap:12}}>
+          {/* Resumo */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))',gap:10}}>
+            {[
+              {label:'Total a receber',val:fmt(fluxoProj.reduce((s,f)=>s+Number(f.entradas??0),0)),color:'var(--teal)'},
+              {label:'Total a pagar',val:fmt(fluxoProj.reduce((s,f)=>s+Number(f.saidas??0),0)),color:'var(--amber)'},
+              {label:'Saldo projetado',val:fmt(fluxoProj.length?Number(fluxoProj[fluxoProj.length-1].saldo_acumulado):0),color:'var(--green)'},
+              {label:'Dias com movimento',val:fluxoProj.filter(f=>Number(f.entradas)>0||Number(f.saidas)>0).length,color:'var(--text)'},
+            ].map(k=>(
+              <div key={k.label} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'10px 14px'}}>
+                <div style={{fontSize:11,color:'var(--text-muted)',fontWeight:600,textTransform:'uppercase'}}>{k.label}</div>
+                <div style={{fontSize:20,fontWeight:700,color:k.color,marginTop:2}}>{k.val}</div>
+              </div>
+            ))}
+          </div>
+          {/* Timeline */}
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--radius)',padding:'14px 18px'}}>
+            <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>Linha do tempo — 30 dias</div>
+            {fluxoProj.filter(f=>Number(f.entradas)>0||Number(f.saidas)>0).length===0
+              ? <div className="empty">Nenhum vencimento nos próximos 30 dias</div>
+              : <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {fluxoProj.filter(f=>Number(f.entradas)>0||Number(f.saidas)>0).map(f=>{
+                    const ent=Number(f.entradas), sai=Number(f.saidas), sal=Number(f.saldo_dia)
+                    const acum=Number(f.saldo_acumulado)
+                    return (
+                      <div key={f.dia} style={{display:'flex',alignItems:'center',gap:12,padding:'8px 12px',background:'var(--bg)',borderRadius:8,flexWrap:'wrap'}}>
+                        <div style={{minWidth:50,fontWeight:600,fontSize:13}}>{f.dia_label}</div>
+                        <div style={{display:'flex',gap:10,flex:1,flexWrap:'wrap'}}>
+                          {ent>0&&<span style={{fontSize:12,color:'var(--teal)',fontWeight:600}}>↑ {fmt(ent)}</span>}
+                          {sai>0&&<span style={{fontSize:12,color:'var(--amber)',fontWeight:600}}>↓ {fmt(sai)}</span>}
+                        </div>
+                        <div style={{textAlign:'right',flexShrink:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:sal>=0?'var(--green)':'var(--red)'}}>Dia: {fmt(sal)}</div>
+                          <div style={{fontSize:11,color:'var(--text-muted)'}}>Acum: {fmt(acum)}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>}
+          </div>
+        </div>
       )}
 
       {/* ABA: PENDÊNCIAS */}

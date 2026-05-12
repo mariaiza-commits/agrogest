@@ -1,6 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = 'https://juqvvdnybhwelctlhdlr.supabase.co'
-const SUPABASE_KEY = 'sb_publishable_Su9Dy3TOVaeYZuiLK1Uerg_nrSUXgCb'
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL
+const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_KEY
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('⚠️ Variáveis de ambiente do Supabase não configuradas. Verifique o arquivo .env')
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
