@@ -1,24 +1,15 @@
 const CACHE_NAME = 'agrogestao-v1'
-const OFFLINE_URL = '/offline.html'
-
-// Arquivos para cachear na instalação
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/offline.html',
-  '/static/js/main.chunk.js',
-  '/static/js/bundle.js',
-  '/manifest.json',
+  '/static/js/main.js',
 ]
 
-// Instala e cacheia os arquivos estáticos
+// Instala e faz cache dos arquivos estáticos
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(STATIC_ASSETS).catch(() => {
-        // Ignora erros de cache individual
-        return Promise.resolve()
-      })
+      return cache.addAll(STATIC_ASSETS).catch(() => {})
     })
   )
   self.skipWaiting()
@@ -34,60 +25,28 @@ self.addEventListener('activate', event => {
   self.clients.claim()
 })
 
-// Intercepta requisições
+// Estratégia: Network first, cache fallback
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url)
+  // Não faz cache de chamadas à API do Supabase
+  if (event.request.url.includes('supabase.co')) return
 
-  // Supabase — deixa passar (não cacheia dados do banco)
-  if (url.hostname.includes('supabase.co')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        // Se falhar e for uma requisição de dados, retorna erro indicando offline
-        return new Response(JSON.stringify({ error: 'offline', message: 'Sem conexão com o servidor' }), {
-          headers: { 'Content-Type': 'application/json' },
-          status: 503
-        })
-      })
-    )
-    return
-  }
-
-  // Para os arquivos do app — tenta rede primeiro, fallback para cache
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const networkFetch = fetch(event.request).then(response => {
-        // Guarda no cache se for bem sucedido
-        if (response.ok) {
+    fetch(event.request)
+      .then(response => {
+        // Salva no cache se for GET bem sucedido
+        if (event.request.method === 'GET' && response.status === 200) {
           const clone = response.clone()
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
         }
         return response
-      }).catch(() => cached || caches.match('/offline.html'))
-
-      // Retorna cache imediato se existir, senão espera a rede
-      return cached || networkFetch
-    })
+      })
+      .catch(() => {
+        // Offline: usa cache
+        return caches.match(event.request).then(cached => {
+          if (cached) return cached
+          // Fallback para index.html (SPA)
+          return caches.match('/index.html')
+        })
+      })
   )
-})
-
-// Background Sync — sincroniza dados offline quando voltar internet
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-pending') {
-    event.waitUntil(syncPendingData())
-  }
-})
-
-async function syncPendingData() {
-  // Notifica os clientes para fazer a sincronização
-  const clients = await self.clients.matchAll()
-  clients.forEach(client => {
-    client.postMessage({ type: 'SYNC_PENDING' })
-  })
-}
-
-// Recebe mensagens do app
-self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') {
-    self.skipWaiting()
-  }
 })

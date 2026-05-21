@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, statusBadge, today, BtnExportar } from '../lib/utils'
 
@@ -7,7 +7,7 @@ const COLS_EXPORT = [
   { label:'Data', accessor: r => fmtDate(r.data) },
   { label:'Lote', accessor: r => r.lotes?.nome??'Geral' },
   { label:'Categoria', accessor: r => r.categorias?.nome??r.categoria },
-  { label:'Descrição', key:'descricao' },
+  { label:'DescriÃ§Ã£o', key:'descricao' },
   { label:'Fornecedor', key:'fornecedor' },
   { label:'Valor', accessor: r => fmt(r.valor) },
   { label:'Vencimento', accessor: r => fmtDate(r.data_vencimento) },
@@ -138,7 +138,7 @@ export default function Custos({ onAddBtn }) {
   }
 
   async function desfazerPagamento(id) {
-    if (!window.confirm('Desfazer pagamento? O valor será removido do caixa e o custo voltará para pendente.')) return
+    if (!window.confirm('Desfazer pagamento? O valor serÃ¡ removido do caixa e o custo voltarÃ¡ para pendente.')) return
     const { error } = await supabase.rpc('fn_desfazer_pagamento',{p_custo_id:id})
     if (error) { alert('Erro: '+error.message); return }
     load()
@@ -178,8 +178,8 @@ export default function Custos({ onAddBtn }) {
     setSelecionados([]);load()
   }
 
-  const totaisCat=filtrados.reduce((acc,c)=>{const n=c.categorias?.nome??c.categoria??'—';acc[n]=(acc[n]??0)+Number(c.valor);return acc},{})
-  const tipoIconConta={caixa:'💵',banco:'🏦',carteira:'👛'}
+  const totaisCat=filtrados.reduce((acc,c)=>{const n=c.categorias?.nome??c.categoria??'â€”';acc[n]=(acc[n]??0)+Number(c.valor);return acc},{})
+  const tipoIconConta={caixa:'ðŸ’µ',banco:'ðŸ¦',carteira:'ðŸ‘›'}
   const pendFilt=filtrados.filter(c=>['pendente','atrasado'].includes(c.status_pagamento))
   const totalSelecionado=selecionados.reduce((s,id)=>{const c=custos.find(x=>x.id===id);return s+Number(c?.valor??0)},0)
 
@@ -212,11 +212,11 @@ export default function Custos({ onAddBtn }) {
 
       {selecionados.length>0&&(
         <div style={{background:'var(--green-light)',border:'1px solid var(--green-mid)',borderRadius:'var(--radius-sm)',padding:'10px 16px',marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-          <span style={{fontWeight:600,color:'var(--green-dark)'}}>{selecionados.length} selecionado(s) — {fmt(totalSelecionado)}</span>
-          <button className="btn btn-sm" style={{background:'var(--teal-light)',color:'var(--teal)',borderColor:'var(--teal)'}} onClick={()=>{setFormMassa({lote_id:'',categoria_id:'',fornecedor:'',fornecedor_novo:'',usando_novo_forn_massa:false,data_vencimento:'',dias_prazo:''});setModalEditarMassa(true)}}>✎ Editar todos</button>
-          <button className="btn btn-primary btn-sm" onClick={()=>{setPagContaId(contas[0]?.id??'');setPagData(today());setModalPagarMassa(true)}}>✓ Pagar todos</button>
-          <button className="btn btn-sm btn-danger" onClick={excluirMassa}>✕ Excluir todos</button>
-          <button className="btn btn-sm" onClick={()=>setSelecionados([])}>Limpar seleção</button>
+          <span style={{fontWeight:600,color:'var(--green-dark)'}}>{selecionados.length} selecionado(s) â€” {fmt(totalSelecionado)}</span>
+          <button className="btn btn-sm" style={{background:'var(--teal-light)',color:'var(--teal)',borderColor:'var(--teal)'}} onClick={()=>{setFormMassa({lote_id:'',categoria_id:'',fornecedor:'',fornecedor_novo:'',usando_novo_forn_massa:false,data_vencimento:'',dias_prazo:''});setModalEditarMassa(true)}}>âœŽ Editar todos</button>
+          <button className="btn btn-primary btn-sm" onClick={()=>{setPagContaId(contas[0]?.id??'');setPagData(today());setModalPagarMassa(true)}}>âœ“ Pagar todos</button>
+          <button className="btn btn-sm btn-danger" onClick={excluirMassa}>âœ• Excluir todos</button>
+          <button className="btn btn-sm" onClick={()=>setSelecionados([])}>Limpar seleÃ§Ã£o</button>
         </div>
       )}
 
@@ -233,7 +233,7 @@ export default function Custos({ onAddBtn }) {
               <table>
                 <thead><tr>
                   <th style={{width:36}}>{pendFilt.length>0&&<input type="checkbox" checked={selecionados.length===pendFilt.length&&pendFilt.length>0} onChange={toggleTodos} style={{cursor:'pointer'}} />}</th>
-                  <th>Data</th><th>Lote</th><th>Categoria</th><th>Descrição</th><th>Fornecedor</th><th>Valor</th><th>Venc.</th><th>Parcela</th><th>Status</th><th></th>
+                  <th>Data</th><th>Vencimento</th><th>Vencimento</th><th>Lote</th><th>Categoria</th><th>DescriÃ§Ã£o</th><th>Fornecedor</th><th>Valor</th><th>Venc.</th><th>Parcela</th><th>Status</th><th></th>
                 </tr></thead>
                 <tbody>
                   {filtrados.map(c=>{
@@ -243,20 +243,20 @@ export default function Custos({ onAddBtn }) {
                     return (
                       <tr key={c.id} style={isSel?{background:'var(--green-light)'}:{}}>
                         <td>{isPend&&<input type="checkbox" checked={isSel} onChange={()=>toggleSel(c.id)} style={{cursor:'pointer'}} />}</td>
-                        <td>{fmtDate(c.data_custo||c.data)}</td>
+                        <td>{fmtDate(c.data_custo||c.data)}</td><td style={{fontSize:12,color:c.data_vencimento && new Date(c.data_vencimento) < new Date() && c.status_pagamento==='pendente' ? 'var(--red)' : 'var(--text-muted)'}}>{c.data_vencimento ? fmtDate(c.data_vencimento) : "â€”"}</td><td style={{fontSize:12, color: c.data_vencimento && new Date(c.data_vencimento) < new Date() && c.status_pagamento === "pendente" ? "var(--red)" : "var(--text-muted)"}}>{c.data_vencimento ? fmtDate(c.data_vencimento) : "â€”"}</td>
                         <td>{c.lotes?.nome??<span style={{color:'var(--text-muted)',fontSize:11}}>Geral</span>}</td>
-                        <td><span className="badge badge-gray">{c.categorias?.nome??c.categoria??'—'}</span></td>
+                        <td><span className="badge badge-gray">{c.categorias?.nome??c.categoria??'â€”'}</span></td>
                         <td>{c.descricao}</td>
-                        <td style={{color:'var(--text-muted)'}}>{c.fornecedor??'—'}</td>
+                        <td style={{color:'var(--text-muted)'}}>{c.fornecedor??'â€”'}</td>
                         <td style={{fontWeight:600,color:'var(--amber)'}}>{fmt(c.valor)}</td>
-                        <td>{c.data_vencimento?<span style={{color:c.status_pagamento==='atrasado'?'var(--red)':'inherit',fontWeight:c.status_pagamento==='atrasado'?600:400}}>{fmtDate(c.data_vencimento)}</span>:'—'}</td>
-                        <td style={{fontSize:12,color:'var(--text-muted)'}}>{c.parcela_total>1?`${c.parcela_numero}/${c.parcela_total}`:'—'}{c.tipo_parcelamento==='mensal'&&' 🔁'}</td>
+                        <td>{c.data_vencimento?<span style={{color:c.status_pagamento==='atrasado'?'var(--red)':'inherit',fontWeight:c.status_pagamento==='atrasado'?600:400}}>{fmtDate(c.data_vencimento)}</span>:'â€”'}</td>
+                        <td style={{fontSize:12,color:'var(--text-muted)'}}>{c.parcela_total>1?`${c.parcela_numero}/${c.parcela_total}`:'â€”'}{c.tipo_parcelamento==='mensal'&&' ðŸ”'}</td>
                         <td><span className={`badge ${cls}`}>{label}</span></td>
                         <td><div style={{display:'flex',gap:4}}>
-                          {isPend&&<button className="btn btn-sm btn-primary" onClick={()=>abrirPagar(c)}>✓</button>}
-                          {c.status_pagamento==='pago'&&<button className="btn btn-sm" style={{color:'var(--amber)',borderColor:'var(--amber-light)',background:'var(--amber-light)'}} onClick={()=>desfazerPagamento(c.id)} title="Desfazer pagamento">↩</button>}
-                          <button className="btn btn-sm" onClick={()=>openModal(c)}>✎</button>
-                          <button className="btn btn-sm btn-danger" onClick={()=>excluir(c.id)}>✕</button>
+                          {isPend&&<button className="btn btn-sm btn-primary" onClick={()=>abrirPagar(c)}>âœ“</button>}
+                          {c.status_pagamento==='pago'&&<button className="btn btn-sm" style={{color:'var(--amber)',borderColor:'var(--amber-light)',background:'var(--amber-light)'}} onClick={()=>desfazerPagamento(c.id)} title="Desfazer pagamento">â†©</button>}
+                          <button className="btn btn-sm" onClick={()=>openModal(c)}>âœŽ</button>
+                          <button className="btn btn-sm btn-danger" onClick={()=>excluir(c.id)}>âœ•</button>
                         </div></td>
                       </tr>
                     )
@@ -271,11 +271,11 @@ export default function Custos({ onAddBtn }) {
       {modal&&(
         <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&closeModal()}>
           <div className="modal">
-            <div className="modal-header"><h3>{editId?'Editar custo':'Novo custo'}</h3><button className="modal-close" onClick={closeModal}>✕</button></div>
+            <div className="modal-header"><h3>{editId?'Editar custo':'Novo custo'}</h3><button className="modal-close" onClick={closeModal}>âœ•</button></div>
             <div className="form-grid">
               <div className="form-group"><label>Lote (opcional)</label>
                 <select value={form.lote_id} onChange={e=>setForm(f=>({...f,lote_id:e.target.value}))}>
-                  <option value="">— Geral —</option>
+                  <option value="">â€” Geral â€”</option>
                   {lotes.map(l=><option key={l.id} value={l.id}>{l.nome}</option>)}
                 </select>
               </div>
@@ -288,13 +288,13 @@ export default function Custos({ onAddBtn }) {
               <div className="form-group" style={{display:'flex',gap:8,alignItems:'flex-end'}}>
                 <div style={{flex:1}}><label>Categoria *</label>
                   <select value={form.categoria_id} onChange={e=>setForm(f=>({...f,categoria_id:e.target.value}))}>
-                    <option value="">— Selecione —</option>
+                    <option value="">â€” Selecione â€”</option>
                     {categorias.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
                   </select>
                 </div>
                 <button type="button" className="btn btn-sm" style={{marginBottom:2}} onClick={()=>setModalCat(true)}>+ Nova</button>
               </div>
-              <div className="form-group form-full"><label>Descrição</label>
+              <div className="form-group form-full"><label>DescriÃ§Ã£o</label>
                 <input value={form.descricao} onChange={e=>setForm(f=>({...f,descricao:e.target.value}))} placeholder="ex: Adubo NPK 25kg (opcional)" />
               </div>
               <div className="form-group form-full"><label>Fornecedor *</label>
@@ -304,28 +304,28 @@ export default function Custos({ onAddBtn }) {
                         const sel=fornecedores.find(f=>f.id===e.target.value)
                         setForm(f=>({...f,fornecedor:sel?.nome??e.target.value,supplier_id:e.target.value}))
                       }} style={{flex:1}}>
-                        <option value="">— Selecione —</option>
+                        <option value="">â€” Selecione â€”</option>
                         {fornecedores.map(f=><option key={f.id} value={f.id}>{f.nome}</option>)}
                       </select>
                       <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_forn:true,fornecedor:'',supplier_id:''}))}>+ Novo</button>
                     </div>
                   : <div style={{display:'flex',gap:8}}>
                       <input autoFocus value={form.fornecedor_novo} onChange={e=>setForm(f=>({...f,fornecedor_novo:e.target.value}))} placeholder="Nome do fornecedor" style={{flex:1}} />
-                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_forn:false,fornecedor_novo:''}))}>← Lista</button>
+                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_forn:false,fornecedor_novo:''}))}>â† Lista</button>
                     </div>}
               </div>
               <div className="form-group"><label>Status</label>
                 <select value={form.status_pagamento} onChange={e=>setForm(f=>({...f,status_pagamento:e.target.value}))}>
-                  <option value="pendente">A pagar</option><option value="pago">Já pago</option>
+                  <option value="pendente">A pagar</option><option value="pago">JÃ¡ pago</option>
                 </select>
               </div>
               {!editId&&(<div className="form-group form-full"><label>Tipo</label>
                 <select value={form.tipo_parcelamento} onChange={e=>setForm(f=>({...f,tipo_parcelamento:e.target.value,num_parcelas:'',num_meses:''}))}>
-                  <option value="avista">À vista</option><option value="parcelado">📦 Parcelado</option><option value="mensal">🔁 Mensal</option>
+                  <option value="avista">Ã€ vista</option><option value="parcelado">ðŸ“¦ Parcelado</option><option value="mensal">ðŸ” Mensal</option>
                 </select>
               </div>)}
               {form.tipo_parcelamento==='parcelado'&&!editId&&(
-                <div className="form-group"><label>Nº parcelas</label>
+                <div className="form-group"><label>NÂº parcelas</label>
                   <input type="number" min="2" value={form.num_parcelas} onChange={e=>setForm(f=>({...f,num_parcelas:e.target.value}))} />
                   {form.num_parcelas>1&&form.valor&&<span className="form-hint">Cada: {fmt(parseFloat(form.valor)/parseInt(form.num_parcelas))}</span>}
                 </div>
@@ -343,13 +343,13 @@ export default function Custos({ onAddBtn }) {
                   <input className={form.dias_prazo?'form-readonly':''} readOnly={!!form.dias_prazo} type={form.dias_prazo?'text':'date'} value={form.dias_prazo?(form.data_vencimento?fmtDate(form.data_vencimento):''):form.data_vencimento} onChange={e=>!form.dias_prazo&&setForm(f=>({...f,data_vencimento:e.target.value}))} style={form.dias_prazo?{fontWeight:600,color:'var(--amber)'}:{}} />
                 </div>
               </>}
-              <div className="form-group form-full"><label>Observações</label>
+              <div className="form-group form-full"><label>ObservaÃ§Ãµes</label>
                 <textarea value={form.observacoes} onChange={e=>setForm(f=>({...f,observacoes:e.target.value}))} />
               </div>
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={closeModal}>Cancelar</button>
-              <button className="btn btn-primary" onClick={save} disabled={saving} style={{flex:1}}>{saving?'Salvando...':editId?'✓ Salvar':'✓ Salvar custo'}</button>
+              <button className="btn btn-primary" onClick={save} disabled={saving} style={{flex:1}}>{saving?'Salvando...':editId?'âœ“ Salvar':'âœ“ Salvar custo'}</button>
             </div>
           </div>
         </div>
@@ -358,8 +358,8 @@ export default function Custos({ onAddBtn }) {
       {modalCat&&(
         <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModalCat(false)}>
           <div className="modal" style={{maxWidth:360}}>
-            <div className="modal-header"><h3>Nova categoria</h3><button className="modal-close" onClick={()=>setModalCat(false)}>✕</button></div>
-            <div className="form-group" style={{marginBottom:16}}><label>Nome</label><input autoFocus value={novaCat} onChange={e=>setNovaCat(e.target.value)} placeholder="ex: Defensivo agrícola" onKeyDown={e=>e.key==='Enter'&&salvarCategoria()} /></div>
+            <div className="modal-header"><h3>Nova categoria</h3><button className="modal-close" onClick={()=>setModalCat(false)}>âœ•</button></div>
+            <div className="form-group" style={{marginBottom:16}}><label>Nome</label><input autoFocus value={novaCat} onChange={e=>setNovaCat(e.target.value)} placeholder="ex: Defensivo agrÃ­cola" onKeyDown={e=>e.key==='Enter'&&salvarCategoria()} /></div>
             <div className="modal-footer"><button className="btn" onClick={()=>setModalCat(false)}>Cancelar</button><button className="btn btn-primary" onClick={salvarCategoria}>Criar</button></div>
           </div>
         </div>
@@ -368,16 +368,16 @@ export default function Custos({ onAddBtn }) {
       {modalPagar&&(
         <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModalPagar(null)}>
           <div className="modal" style={{maxWidth:420}}>
-            <div className="modal-header"><h3>Confirmar pagamento</h3><button className="modal-close" onClick={()=>setModalPagar(null)}>✕</button></div>
+            <div className="modal-header"><h3>Confirmar pagamento</h3><button className="modal-close" onClick={()=>setModalPagar(null)}>âœ•</button></div>
             <div style={{background:'var(--amber-light)',borderRadius:'var(--radius-sm)',padding:'12px 14px',marginBottom:16}}>
-              <div style={{fontSize:12,color:'var(--amber)',marginBottom:4}}>{modalPagar.descricao}{modalPagar.fornecedor&&` — ${modalPagar.fornecedor}`}</div>
+              <div style={{fontSize:12,color:'var(--amber)',marginBottom:4}}>{modalPagar.descricao}{modalPagar.fornecedor&&` â€” ${modalPagar.fornecedor}`}</div>
               <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--font-display)',color:'var(--amber)'}}>{fmt(modalPagar.valor)}</div>
             </div>
             <div className="form-grid">
               <div className="form-group form-full"><label>Pagar com qual conta *</label>
                 <select value={pagContaId} onChange={e=>setPagContaId(e.target.value)}>
-                  <option value="">— Selecione —</option>
-                  {contas.map(c=><option key={c.id} value={c.id}>{tipoIconConta[c.tipo]??'🏦'} {c.nome} — {fmt(c.saldo_atual)}</option>)}
+                  <option value="">â€” Selecione â€”</option>
+                  {contas.map(c=><option key={c.id} value={c.id}>{tipoIconConta[c.tipo]??'ðŸ¦'} {c.nome} â€” {fmt(c.saldo_atual)}</option>)}
                 </select>
               </div>
               <div className="form-group form-full"><label>Data do pagamento</label>
@@ -386,7 +386,7 @@ export default function Custos({ onAddBtn }) {
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={()=>setModalPagar(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={confirmarPagar} disabled={saving} style={{flex:1}}>{saving?'Confirmando...':'✓ Confirmar'}</button>
+              <button className="btn btn-primary" onClick={confirmarPagar} disabled={saving} style={{flex:1}}>{saving?'Confirmando...':'âœ“ Confirmar'}</button>
             </div>
           </div>
         </div>
@@ -395,18 +395,18 @@ export default function Custos({ onAddBtn }) {
       {modalEditarMassa&&(
         <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModalEditarMassa(false)}>
           <div className="modal" style={{maxWidth:480}}>
-            <div className="modal-header"><h3>Editar {selecionados.length} custo(s)</h3><button className="modal-close" onClick={()=>setModalEditarMassa(false)}>✕</button></div>
+            <div className="modal-header"><h3>Editar {selecionados.length} custo(s)</h3><button className="modal-close" onClick={()=>setModalEditarMassa(false)}>âœ•</button></div>
             <p style={{fontSize:13,color:'var(--text-muted)',marginBottom:16}}>Preencha apenas os campos que deseja alterar.</p>
             <div className="form-grid">
               <div className="form-group"><label>Lote</label>
                 <select value={formMassa.lote_id} onChange={e=>setFormMassa(f=>({...f,lote_id:e.target.value}))}>
-                  <option value="">— Não alterar —</option>
+                  <option value="">â€” NÃ£o alterar â€”</option>
                   {lotes.map(l=><option key={l.id} value={l.id}>{l.nome}</option>)}
                 </select>
               </div>
               <div className="form-group"><label>Categoria</label>
                 <select value={formMassa.categoria_id} onChange={e=>setFormMassa(f=>({...f,categoria_id:e.target.value}))}>
-                  <option value="">— Não alterar —</option>
+                  <option value="">â€” NÃ£o alterar â€”</option>
                   {categorias.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
                 </select>
               </div>
@@ -414,14 +414,14 @@ export default function Custos({ onAddBtn }) {
                 {!formMassa.usando_novo_forn_massa
                   ? <div style={{display:'flex',gap:8}}>
                       <select value={formMassa.fornecedor} onChange={e=>setFormMassa(f=>({...f,fornecedor:e.target.value}))} style={{flex:1}}>
-                        <option value="">— Não alterar —</option>
+                        <option value="">â€” NÃ£o alterar â€”</option>
                         {fornecedores.map(f=><option key={f} value={f}>{f}</option>)}
                       </select>
                       <button type="button" className="btn btn-sm" onClick={()=>setFormMassa(f=>({...f,usando_novo_forn_massa:true,fornecedor:''}))}>+ Novo</button>
                     </div>
                   : <div style={{display:'flex',gap:8}}>
                       <input autoFocus value={formMassa.fornecedor_novo} onChange={e=>setFormMassa(f=>({...f,fornecedor_novo:e.target.value}))} placeholder="Nome" style={{flex:1}} />
-                      <button type="button" className="btn btn-sm" onClick={()=>setFormMassa(f=>({...f,usando_novo_forn_massa:false,fornecedor_novo:''}))}>← Lista</button>
+                      <button type="button" className="btn btn-sm" onClick={()=>setFormMassa(f=>({...f,usando_novo_forn_massa:false,fornecedor_novo:''}))}>â† Lista</button>
                     </div>}
               </div>
               <div className="form-group"><label>Prazo (dias)</label>
@@ -434,7 +434,7 @@ export default function Custos({ onAddBtn }) {
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={()=>setModalEditarMassa(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={confirmarEditarMassa} disabled={saving} style={{flex:1}}>{saving?'Salvando...':'✓ Aplicar alterações'}</button>
+              <button className="btn btn-primary" onClick={confirmarEditarMassa} disabled={saving} style={{flex:1}}>{saving?'Salvando...':'âœ“ Aplicar alteraÃ§Ãµes'}</button>
             </div>
           </div>
         </div>
@@ -443,7 +443,7 @@ export default function Custos({ onAddBtn }) {
       {modalPagarMassa&&(
         <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModalPagarMassa(false)}>
           <div className="modal" style={{maxWidth:420}}>
-            <div className="modal-header"><h3>Pagar {selecionados.length} custo(s)</h3><button className="modal-close" onClick={()=>setModalPagarMassa(false)}>✕</button></div>
+            <div className="modal-header"><h3>Pagar {selecionados.length} custo(s)</h3><button className="modal-close" onClick={()=>setModalPagarMassa(false)}>âœ•</button></div>
             <div style={{background:'var(--amber-light)',borderRadius:'var(--radius-sm)',padding:'12px 14px',marginBottom:16}}>
               <div style={{fontSize:12,color:'var(--amber)',marginBottom:4}}>{selecionados.length} custo(s) selecionado(s)</div>
               <div style={{fontSize:22,fontWeight:700,fontFamily:'var(--font-display)',color:'var(--amber)'}}>{fmt(totalSelecionado)}</div>
@@ -451,8 +451,8 @@ export default function Custos({ onAddBtn }) {
             <div className="form-grid">
               <div className="form-group form-full"><label>Pagar com qual conta *</label>
                 <select value={pagContaId} onChange={e=>setPagContaId(e.target.value)}>
-                  <option value="">— Selecione —</option>
-                  {contas.map(c=><option key={c.id} value={c.id}>{tipoIconConta[c.tipo]??'🏦'} {c.nome} — {fmt(c.saldo_atual)}</option>)}
+                  <option value="">â€” Selecione â€”</option>
+                  {contas.map(c=><option key={c.id} value={c.id}>{tipoIconConta[c.tipo]??'ðŸ¦'} {c.nome} â€” {fmt(c.saldo_atual)}</option>)}
                 </select>
               </div>
               <div className="form-group form-full"><label>Data do pagamento</label>
@@ -461,7 +461,7 @@ export default function Custos({ onAddBtn }) {
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={()=>setModalPagarMassa(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={confirmarPagarMassa} disabled={saving} style={{flex:1}}>{saving?'Processando...':'✓ Confirmar pagamento em massa'}</button>
+              <button className="btn btn-primary" onClick={confirmarPagarMassa} disabled={saving} style={{flex:1}}>{saving?'Processando...':'âœ“ Confirmar pagamento em massa'}</button>
             </div>
           </div>
         </div>
@@ -469,3 +469,4 @@ export default function Custos({ onAddBtn }) {
     </>
   )
 }
+

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, today } from '../lib/utils'
 
@@ -70,6 +70,15 @@ export default function Atividades({ onAddBtn }) {
 
   async function save() {
     if (!form.lote_id || !form.tipo_atividade) return alert('Selecione o lote e o tipo de atividade.')
+    const _tipo = form.tipo_atividade.normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    if (_tipo === 'Adubacao' || _tipo === 'Pulverizacao') {
+      const _linhas = linhasInsumos.filter(l => l.insumo_id && parseFloat(l.quantidade) > 0)
+      if (_linhas.length === 0) { return alert('Para Adubacao ou Pulverizacao informe o insumo em Estoque.') }
+      for (const _l of _linhas) {
+        const { data: _v } = await supabase.rpc('fn_validar_insumo_atividade', { p_insumo_id: _l.insumo_id, p_quantidade: parseFloat(_l.quantidade) || 0 })
+        if (_v && !_v.ok) { return alert(_v.erro) }
+      }
+    }
     setSaving(true)
     const payload = { lote_id:form.lote_id, setor_id:form.setor_id||null, data:form.data, tipo_atividade:form.tipo_atividade, observacoes:form.observacoes||null, status:'realizada' }
     let atvId = editId

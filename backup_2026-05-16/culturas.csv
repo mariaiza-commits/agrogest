@@ -1,0 +1,7 @@
+id,nome,tipo,unidade_producao,unidade_area,icone,ativo,criado_em,settings,deleted_at,descricao
+49da1e00-ba4f-4a3b-b42a-d017be7d4fda,Banana,agricultura,caixa,ha,🍌,true,2026-05-04T22:20:15.102011+00:00,[object Object],,
+c7fe33f6-d393-46b9-9f6e-ad7ee2fafbe0,Café,agricultura,saca,ha,���,true,2026-05-04T22:20:15.102011+00:00,[object Object],2026-05-10T20:40:46.769+00:00,
+5ece1eb9-6f37-4b0b-b0fc-edaebead6d97,Cana,agricultura,tonelada,ha,🎋,true,2026-05-04T22:20:15.102011+00:00,[object Object],2026-05-10T20:40:50.181+00:00,
+ac72132b-b03c-465b-bff2-06fe2333f8d4,Milho,agricultura,saca,ha,🌽,true,2026-05-04T22:20:15.102011+00:00,[object Object],2026-05-10T20:40:57.187+00:00,
+0e99bab8-6ff3-4a83-8d8d-61d4b1f6e899,Soja,agricultura,saca,ha,🌿,true,2026-05-04T22:20:15.102011+00:00,[object Object],2026-05-10T20:41:00.77+00:00,
+ebfcf292-867e-4a4e-8038-ed750523863f,Gado,pecuaria,arroba,ha,🐄,true,2026-05-04T22:20:15.102011+00:00,[object Object],,

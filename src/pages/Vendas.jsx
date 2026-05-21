@@ -1,228 +1,268 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmt, fmtDate, statusBadge, today, BtnExportar } from '../lib/utils'
-
-const EMPTY = { carga_id:'', client_id:'', comprador:'', comprador_novo:'', usando_novo_comprador:false, quantidade_primeira:'', quantidade_segunda:'', preco_primeira:'', preco_segunda:'', forma_pagamento:'a_vista', dias_prazo:'', data_vencimento:'', conta_vista_id:'', observacoes:'' }
-
-const COLS_EXPORT = [
-  { label:'Data', accessor: r => fmtDate(r.data_venda) },
-  { label:'Comprador', key:'comprador' },
-  { label:'Carga', accessor: r => fmtDate(r.cargas?.data) },
-  { label:'1ª cx', key:'quantidade_primeira' },
-  { label:'Preço 1ª', accessor: r => fmt(r.preco_primeira) },
-  { label:'2ª cx', key:'quantidade_segunda' },
-  { label:'Preço 2ª', accessor: r => fmt(r.preco_segunda) },
-  { label:'Total', accessor: r => fmt(r.valor_total) },
-  { label:'Status', key:'status_pagamento' },
-]
+import { fmt, fmtDate } from '../lib/utils'
 
 export default function Vendas({ onAddBtn }) {
-  const [cargas, setCargas]         = useState([])
-  const [vendas, setVendas]         = useState([])
-  const [filtrados, setFiltrados]   = useState([])
-  const [compradores, setCompradores] = useState([])
-  const [contas, setContas]         = useState([])
-  const [loading, setLoading]       = useState(true)
-  const [modal, setModal]           = useState(false)
+  const [vendas, setVendas]     = useState([])
+  const [cargas, setCargas]     = useState([])
+  const [clientes, setClientes] = useState([])
+  const [contas, setContas]     = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [modal, setModal]       = useState(false)
+  const [editId, setEditId]     = useState(null)
+  const [saving, setSaving]     = useState(false)
+  const [detalhe, setDetalhe]   = useState(null)
   const [modalReceber, setModalReceber] = useState(null)
-  const [form, setForm]             = useState(EMPTY)
-  const [editId, setEditId]         = useState(null)
-  const [saving, setSaving]         = useState(false)
-  const [filtro, setFiltro]         = useState('todas')
-  const [dataIni, setDataIni]       = useState('')
-  const [dataFim, setDataFim]       = useState('')
-  const [ordem, setOrdem]           = useState('desc')
-  const [recContaId, setRecContaId] = useState('')
-  const [recData, setRecData]       = useState(today())
+  const [contaReceber, setContaReceber] = useState('')
+  const [salvandoRec, setSalvandoRec]   = useState(false)
+
+  const [form, setForm] = useState({
+    carga_id: '', client_id: '',
+    data_venda: new Date().toISOString().split('T')[0],
+    condicao: 'avista', prazo_dias: 30,
+    conta_financeira_id: '', marcar_recebido: false,
+    funrural_pct: 0, ptv_valor: 0,
+    observacoes: '',
+    desconto_avista_pct: 0,
+  })
+  const [itensVenda, setItensVenda] = useState([])
 
   useEffect(() => { load() }, [])
-  useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [cargas])
-  useEffect(() => { aplicarFiltros() }, [vendas, filtro, dataIni, dataFim, ordem])
+  useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [vendas])
 
   async function load() {
     setLoading(true)
-    const [{ data: cs }, { data: vs }, { data: cfs }] = await Promise.all([
-      supabase.from('vw_resumo_cargas').select('*').order('data', { ascending: false }),
-      supabase.from('vendas').select('*,cargas(data)').order('data_venda',{ascending:false}).limit(100),
-      supabase.from('contas_financeiras').select('id,nome,tipo,saldo_atual').eq('ativo',true).order('nome'),
+    const [{ data: vs }, { data: cs }, { data: cls }, { data: cfs }] = await Promise.all([
+      supabase.from('vendas').select('*').is('deleted_at', null).order('data_venda', { ascending: false }).limit(100),
+      supabase.from('vw_resumo_cargas').select('*').order('data', { ascending: false }).limit(50),
+      supabase.from('clients').select('id,nome').is('deleted_at', null).order('nome'),
+      supabase.from('contas_financeiras').select('id,nome').eq('ativo', true).order('nome'),
     ])
-    setCargas(cs??[]); setVendas(vs??[]); setContas(cfs??[])
-    // Carrega clientes cadastrados
-    const { data: clientes } = await supabase.from('clients').select('id,nome').is('deleted_at',null).order('nome')
-    setCompradores(clientes ?? [])
+    setVendas(vs ?? [])
+    setCargas(cs ?? [])
+    setClientes(cls ?? [])
+    setContas(cfs ?? [])
     setLoading(false)
   }
 
-  function aplicarFiltros() {
-    let lista=[...vendas]
-    if (filtro==='pendente') lista=lista.filter(v=>['pendente','atrasado'].includes(v.status_pagamento))
-    if (filtro==='recebido') lista=lista.filter(v=>v.status_pagamento==='recebido')
-    if (dataIni) lista=lista.filter(v=>v.data_venda>=dataIni)
-    if (dataFim) lista=lista.filter(v=>v.data_venda<=dataFim)
-    lista.sort((a,b)=>ordem==='asc'?a.data_venda.localeCompare(b.data_venda):b.data_venda.localeCompare(a.data_venda))
-    setFiltrados(lista)
+  async function carregarItens(carga_id) {
+    if (!carga_id) { setItensVenda([]); return }
+    const { data } = await supabase
+      .from('carga_itens')
+      .select('*, lotes(nome), setores(nome,variedade,cultura)')
+      .eq('carga_id', carga_id)
+    setItensVenda((data ?? []).map(it => ({
+      carga_item_id: it.id,
+      lote_nome:  it.lotes?.nome ?? '—',
+      setor_nome: it.setores?.nome ?? '',
+      variedade:  it.setores?.variedade || it.setores?.cultura || '',
+      qtd1:  Number(it.quantidade_primeira) || 0,
+      qtd2:  Number(it.quantidade_segunda)  || 0,
+      peso1: Number(it.peso_medio_primeira) || 0,
+      peso2: Number(it.peso_medio_segunda)  || 0,
+      preco_kg1: Number(it.preco_kg_primeira) || 0,
+      preco_kg2: Number(it.preco_kg_segunda)  || 0,
+    })))
   }
 
-  function getCarga(id) { return cargas.find(c => c.carga_id === id) }
-
-  function handleCargaChange(cargaId) {
-    const carga = getCarga(cargaId)
-    setForm(f => ({
-      ...f, carga_id: cargaId,
-      quantidade_primeira: carga ? String(Number(carga.saldo_primeira)) : '',
-      quantidade_segunda: carga ? String(Number(carga.saldo_segunda)) : '',
-    }))
+  function updItem(idx, field, value) {
+    setItensVenda(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
   }
 
-  function handleDiasPrazo(dias) {
-    const n=parseInt(dias)
-    const venc=n>0?new Date(new Date().getTime()+n*86400000).toISOString().split('T')[0]:''
-    setForm(f=>({...f,dias_prazo:dias,data_vencimento:venc}))
-  }
+  const dataVencimento = useMemo(() => {
+    if (form.condicao === 'avista') return form.data_venda
+    if (!form.data_venda || !form.prazo_dias) return ''
+    const d = new Date(form.data_venda)
+    d.setDate(d.getDate() + Number(form.prazo_dias))
+    return d.toISOString().split('T')[0]
+  }, [form.condicao, form.data_venda, form.prazo_dias])
 
-  const cargaSel = getCarga(form.carga_id)
-  const valorTotal = (() => {
-    const v1 = (parseInt(form.quantidade_primeira)||0) * (parseFloat(form.preco_primeira)||0)
-    const v2 = (parseInt(form.quantidade_segunda)||0) * (parseFloat(form.preco_segunda)||0)
-    return v1+v2 > 0 ? v1+v2 : null
-  })()
+  const totais = useMemo(() => {
+    let bruto = 0
+    itensVenda.forEach(it => {
+      bruto += (it.qtd1 * it.peso1 * it.preco_kg1) + (it.qtd2 * it.peso2 * it.preco_kg2)
+    })
+    const funrural = bruto * (Number(form.funrural_pct) / 100)
+    const apos_funrural = bruto - funrural
+    const desconto = apos_funrural * (Number(form.desconto_avista_pct) / 100)
+    const ptv = Number(form.ptv_valor) || 0
+    return {
+      bruto, funrural, ptv, desconto,
+      liquido: apos_funrural - desconto - ptv,
+      qtd1: itensVenda.reduce((s, it) => s + it.qtd1, 0),
+      qtd2: itensVenda.reduce((s, it) => s + it.qtd2, 0),
+    }
+  }, [itensVenda, form.funrural_pct, form.ptv_valor, form.desconto_avista_pct])
 
-  function openModal(v=null) {
-    if (v) {
-      setForm({ carga_id:v.carga_id??'', comprador:v.comprador, comprador_novo:'', usando_novo_comprador:false, quantidade_primeira:v.quantidade_primeira??0, quantidade_segunda:v.quantidade_segunda??0, preco_primeira:v.preco_primeira??'', preco_segunda:v.preco_segunda??'', forma_pagamento:v.forma_pagamento, dias_prazo:'', data_vencimento:v.data_vencimento?.split('T')[0]??'', conta_vista_id:'', observacoes:v.observacoes??'' })
-      setEditId(v.id)
-    } else { setForm(EMPTY); setEditId(null) }
+  async function openModal(venda = null) {
+    setEditId(null)
+    setItensVenda([])
+    if (venda) {
+      setEditId(venda.id)
+      setForm({
+        carga_id: venda.carga_id ?? '',
+        client_id: venda.client_id ?? '',
+        data_venda: venda.data_venda ?? '',
+        condicao: venda.forma_pagamento === 'prazo' ? 'prazo' : 'avista',
+        prazo_dias: 30,
+        conta_financeira_id: venda.conta_financeira_id ?? '',
+        marcar_recebido: !!venda.conta_financeira_id,
+        funrural_pct: venda.funrural_pct ?? 0,
+        ptv_valor: venda.ptv_valor ?? 0,
+        observacoes: venda.observacoes ?? '',
+      })
+      if (venda.carga_id) await carregarItens(venda.carga_id)
+    } else {
+      setForm({
+        carga_id: '', client_id: '',
+        data_venda: new Date().toISOString().split('T')[0],
+        condicao: 'avista', prazo_dias: 30,
+        conta_financeira_id: '', marcar_recebido: false,
+        funrural_pct: 0, ptv_valor: 0, desconto_avista_pct: 0, observacoes: '',
+      })
+    }
     setModal(true)
   }
 
-  const compradorFinal = form.usando_novo_comprador ? form.comprador_novo : form.comprador
-
   async function save() {
-    if (!form.carga_id) return alert('Selecione a carga.')
-    if (!compradorFinal) return alert('Informe o comprador.')
-    if (!form.preco_primeira && !form.preco_segunda) return alert('Informe pelo menos um preço.')
-    if (form.forma_pagamento==='a_prazo'&&!form.data_vencimento) return alert('Informe o prazo.')
-
-    // Valida saldo
-    const carga = getCarga(form.carga_id)
-    if (carga && !editId) {
-      const saldo1 = Number(carga.saldo_primeira)
-      const saldo2 = Number(carga.saldo_segunda)
-      const qtd1   = parseInt(form.quantidade_primeira)||0
-      const qtd2   = parseInt(form.quantidade_segunda)||0
-      if (qtd1 > saldo1) return alert(`Saldo insuficiente de 1ª: disponível ${saldo1} cx.`)
-      if (qtd2 > saldo2) return alert(`Saldo insuficiente de 2ª: disponível ${saldo2} cx.`)
-    }
-
+    if (!form.carga_id)   return alert('Selecione a carga.')
+    if (!form.client_id)  return alert('Selecione o cliente.')
+    if (itensVenda.length === 0) return alert('Nenhum item encontrado.')
     setSaving(true)
-    const total = valorTotal ?? 0
-    const payload = {
-      carga_id: form.carga_id, comprador: compradorFinal,
-      client_id: form.client_id || null,
-      quantidade_primeira: parseInt(form.quantidade_primeira)||0,
-      quantidade_segunda: parseInt(form.quantidade_segunda)||0,
-      preco_primeira: parseFloat(form.preco_primeira)||0,
-      preco_segunda: parseFloat(form.preco_segunda)||0,
-      valor_total: total,
-      quantidade_caixas: (parseInt(form.quantidade_primeira)||0)+(parseInt(form.quantidade_segunda)||0),
-      preco_unitario: total > 0 ? total/((parseInt(form.quantidade_primeira)||0)+(parseInt(form.quantidade_segunda)||0)||1) : 0,
-      forma_pagamento: form.forma_pagamento,
-      data_venda: today(),
-      data_vencimento: form.data_vencimento||null,
-      observacoes: form.observacoes||null,
-    }
-
-    if (editId) {
-      await supabase.from('vendas').update(payload).eq('id',editId)
-    } else {
-      const isVista = form.forma_pagamento==='a_vista'
-      const { data: nova } = await supabase.from('vendas').insert({
-        ...payload,
-        status_pagamento: isVista?'recebido':'pendente',
-        data_recebimento: isVista?today():null,
-        conta_financeira_id: isVista&&form.conta_vista_id?form.conta_vista_id:null,
-      }).select().single()
-      if (isVista && form.conta_vista_id && nova) {
-        await supabase.rpc('fn_receber_venda',{p_venda_id:nova.id,p_data_recebimento:today(),p_conta_id:form.conta_vista_id})
-      }
-    }
-    setSaving(false); setModal(false); load()
+    try {
+      const status = form.condicao === 'avista' ? 'recebido' : 'pendente'
+      const { error } = await supabase.rpc('fn_salvar_venda', {
+        p_venda_id:        editId || null,
+        p_carga_id:        form.carga_id,
+        p_client_id:       form.client_id || null,
+        p_comprador:       clientes.find(c => c.id === form.client_id)?.nome || null,
+        p_data_venda:      form.data_venda,
+        p_data_vencimento: dataVencimento || null,
+        p_condicao:        form.condicao,
+        p_funrural_pct:    Number(form.funrural_pct) || 0,
+        p_ptv_valor:       Number(form.ptv_valor) || 0,
+        p_desconto_avista_pct: Number(form.desconto_avista_pct) || 0,
+        p_observacoes:     form.observacoes || null,
+        p_status:          form.marcar_recebido ? 'recebido' : status,
+        p_conta_id:        form.marcar_recebido ? form.conta_financeira_id || null : null,
+        p_itens:           itensVenda.map(it => ({
+          carga_item_id: it.carga_item_id,
+          qtd1: it.qtd1, qtd2: it.qtd2,
+          peso1: it.peso1, peso2: it.peso2,
+          preco_kg1: it.preco_kg1, preco_kg2: it.preco_kg2,
+        })),
+      })
+      if (error) throw new Error(error.message)
+      setModal(false)
+      await load()
+    } catch(err) { alert('Erro: ' + err.message) }
+    finally { setSaving(false) }
   }
 
-  function abrirReceber(venda) { setModalReceber(venda); setRecContaId(contas[0]?.id??''); setRecData(today()) }
-
-  async function confirmarReceber() {
-    if (!recContaId) return alert('Selecione a conta.')
-    setSaving(true)
-    const { error } = await supabase.rpc('fn_receber_venda',{p_venda_id:modalReceber.id,p_data_recebimento:recData,p_conta_id:recContaId})
-    if (error) { alert('Erro: '+error.message); setSaving(false); return }
-    setSaving(false); setModalReceber(null); load()
+  async function receberVenda() {
+    if (!contaReceber) return alert('Selecione a conta.')
+    setSalvandoRec(true)
+    await supabase.from('vendas').update({
+      status_pagamento: 'recebido',
+      conta_financeira_id: contaReceber,
+    }).eq('id', modalReceber.id)
+    setSalvandoRec(false); setModalReceber(null); setContaReceber(''); load()
   }
 
   async function desfazerRecebimento(id) {
-    if (!window.confirm('Desfazer recebimento? O valor será removido do caixa.')) return
-    await supabase.rpc('fn_desfazer_recebimento',{p_venda_id:id}); load()
+    if (!window.confirm('Desfazer recebimento? A venda voltará para pendente.')) return
+    await supabase.from('vendas').update({
+      status_pagamento: 'pendente',
+      conta_financeira_id: null,
+    }).eq('id', id)
+    load()
   }
 
   async function excluir(id) {
     if (!window.confirm('Excluir esta venda?')) return
-    await supabase.from('vendas').delete().eq('id',id); load()
+    await supabase.from('vendas').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+    load()
   }
 
-  const tipoIconConta={caixa:'💵',banco:'🏦',carteira:'👛'}
+  const totalReceita  = vendas.reduce((s, v) => s + Number(v.valor_liquido ?? 0), 0)
+  const totalPendente = vendas.filter(v => v.status_pagamento === 'pendente').reduce((s, v) => s + Number(v.valor_liquido ?? 0), 0)
+  const statusColor   = { pendente:'var(--amber)', recebido:'var(--green)', pago:'var(--green)', atrasado:'var(--red)' }
 
   if (loading) return <div className="loading">Carregando vendas...</div>
 
   return (
     <>
-      <div className="card" style={{marginBottom:12,padding:'12px 16px'}}>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div className="form-group" style={{marginBottom:0}}><label>Data inicial</label><input type="date" value={dataIni} onChange={e=>setDataIni(e.target.value)} /></div>
-          <div className="form-group" style={{marginBottom:0}}><label>Data final</label><input type="date" value={dataFim} onChange={e=>setDataFim(e.target.value)} /></div>
-          <div className="form-group" style={{marginBottom:0}}><label>Ordenar</label>
-            <select value={ordem} onChange={e=>setOrdem(e.target.value)}><option value="desc">Mais recente</option><option value="asc">Mais antigo</option></select>
+      {/* KPIs */}
+      <div style={{ display:'flex', gap:10, marginBottom:14, flexWrap:'wrap' }}>
+        {[
+          { label:'Receita total', val:fmt(totalReceita),  color:'var(--teal)' },
+          { label:'Pendente',      val:fmt(totalPendente), color:'var(--amber)' },
+          { label:'Vendas',        val:vendas.length },
+        ].map(k => (
+          <div key={k.label} style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--radius-sm)', padding:'8px 14px' }}>
+            <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase' }}>{k.label}</div>
+            <div style={{ fontSize:16, fontWeight:700, color:k.color??'var(--text)', marginTop:2 }}>{k.val}</div>
           </div>
-          <button className="btn btn-sm" onClick={()=>{setDataIni('');setDataFim('')}}>Limpar</button>
-          <BtnExportar dados={filtrados} colunas={COLS_EXPORT} nome="vendas" />
-        </div>
+        ))}
       </div>
 
-      <div className="tabs">
-        <button className={`tab ${filtro==='todas'?'active':''}`} onClick={()=>setFiltro('todas')}>Todas ({vendas.length})</button>
-        <button className={`tab ${filtro==='pendente'?'active':''}`} onClick={()=>setFiltro('pendente')}>A receber ({vendas.filter(v=>['pendente','atrasado'].includes(v.status_pagamento)).length})</button>
-        <button className={`tab ${filtro==='recebido'?'active':''}`} onClick={()=>setFiltro('recebido')}>Recebidas ({vendas.filter(v=>v.status_pagamento==='recebido').length})</button>
-      </div>
-
-      {filtrados.length===0
-        ? <div className="empty">Nenhuma venda encontrada.</div>
+      {/* LISTA */}
+      {vendas.length === 0
+        ? <div className="empty">Nenhuma venda registrada.</div>
         : <div className="card">
             <div className="table-wrap">
               <table>
-                <thead><tr><th>Data</th><th>Comprador</th><th>Carga</th><th>1ª cx</th><th>Preço 1ª</th><th>2ª cx</th><th>Preço 2ª</th><th>Total</th><th>Venc.</th><th>Status</th><th></th></tr></thead>
+                <thead><tr>
+                  <th>Data</th><th>Cliente</th><th>Condição</th>
+                  <th style={{textAlign:'right'}}>Qtd</th>
+                  <th style={{textAlign:'right'}}>Bruto</th>
+                  <th style={{textAlign:'right'}}>Líquido</th>
+                  <th>Vencimento</th><th>Status</th><th></th>
+                </tr></thead>
                 <tbody>
-                  {filtrados.map(v=>{
-                    const {cls,label}=statusBadge(v.status_pagamento)
-                    return (
-                      <tr key={v.id}>
-                        <td>{fmtDate(v.data_venda)}</td>
-                        <td><strong>{v.comprador}</strong></td>
-                        <td style={{fontSize:12,color:'var(--text-muted)'}}>{v.cargas?.data?fmtDate(v.cargas.data):'—'}</td>
-                        <td style={{color:'var(--green)',fontWeight:600}}>{v.quantidade_primeira??0}</td>
-                        <td style={{color:'var(--text-muted)',fontSize:12}}>{v.preco_primeira?fmt(v.preco_primeira):'—'}</td>
-                        <td style={{color:'var(--amber)',fontWeight:600}}>{v.quantidade_segunda??0}</td>
-                        <td style={{color:'var(--text-muted)',fontSize:12}}>{v.preco_segunda?fmt(v.preco_segunda):'—'}</td>
-                        <td style={{fontWeight:600,color:'var(--teal)'}}>{fmt(v.valor_total)}</td>
-                        <td>{fmtDate(v.data_vencimento)}</td>
-                        <td><span className={`badge ${cls}`}>{label}</span></td>
-                        <td><div style={{display:'flex',gap:4}}>
-                          {['pendente','atrasado'].includes(v.status_pagamento)&&<button className="btn btn-sm btn-primary" onClick={()=>abrirReceber(v)}>✓</button>}
-                          {v.status_pagamento==='recebido'&&<button className="btn btn-sm" style={{color:'var(--amber)',borderColor:'var(--amber-light)',background:'var(--amber-light)'}} onClick={()=>desfazerRecebimento(v.id)} title="Desfazer">↩</button>}
+                  {vendas.map(v => (
+                    <tr key={v.id} style={{cursor:'pointer'}} onClick={() => setDetalhe(v)}>
+                      <td><strong>{fmtDate(v.data_venda)}</strong></td>
+                      <td>{v.comprador || '—'}</td>
+                      <td>
+                        <span style={{ fontSize:11, fontWeight:600, background:v.forma_pagamento==='avista'?'var(--green-light)':'var(--amber-light)', color:v.forma_pagamento==='avista'?'var(--green)':'var(--amber)', borderRadius:4, padding:'1px 7px' }}>
+                          {v.forma_pagamento === 'avista' ? 'À vista' : 'A prazo'}
+                        </span>
+                      </td>
+                      <td style={{textAlign:'right'}}>{Number((v.quantidade_primeira||0)+(v.quantidade_segunda||0)).toLocaleString('pt-BR')}</td>
+                      <td style={{textAlign:'right', color:'var(--teal)', fontWeight:600}}>{fmt(v.valor_total)}</td>
+                      <td style={{textAlign:'right', fontWeight:700, color:'var(--green)'}}>{fmt(v.valor_liquido)}</td>
+                      <td style={{fontSize:12, color: v.data_vencimento && new Date(v.data_vencimento) < new Date() && v.status_pagamento === 'pendente' ? 'var(--red)' : 'var(--text-muted)'}}>
+                        {v.data_vencimento ? fmtDate(v.data_vencimento) : '—'}
+                      </td>
+                      <td style={{fontSize:12, color: v.data_vencimento && new Date(v.data_vencimento) < new Date() && v.status_pagamento==='pendente' ? 'var(--red)' : 'var(--text-muted)'}}>
+                        {v.data_vencimento ? fmtDate(v.data_vencimento) : '—'}
+                      </td>
+                      <td>
+                        <span style={{ fontSize:11, fontWeight:600, color:statusColor[v.status_pagamento]??'var(--text-muted)' }}>
+                          {v.status_pagamento==='recebido'?'✅ Recebido':v.status_pagamento==='pendente'?'⏳ Pendente':v.status_pagamento}
+                        </span>
+                      </td>
+                      <td onClick={e => e.stopPropagation()}>
+                        <div style={{display:'flex', gap:4}}>
+                          {(v.status_pagamento==='pendente'||v.status_pagamento==='atrasado') && (
+                            <button className="btn btn-sm" style={{background:'var(--green-light)',color:'var(--green)',whiteSpace:'nowrap'}}
+                              onClick={()=>{setModalReceber(v);setContaReceber('')}}>
+                              💰 Receber
+                            </button>
+                          )}
+                          {(v.status_pagamento==='recebido'||v.status_pagamento==='pago') && (
+                            <button className="btn btn-sm" style={{background:'var(--amber-light)',color:'var(--amber)',whiteSpace:'nowrap'}}
+                              onClick={()=>desfazerRecebimento(v.id)}>
+                              ↩ Desfazer
+                            </button>
+                          )}
                           <button className="btn btn-sm" onClick={()=>openModal(v)}>✎</button>
                           <button className="btn btn-sm btn-danger" onClick={()=>excluir(v.id)}>✕</button>
-                        </div></td>
-                      </tr>
-                    )
-                  })}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -230,99 +270,249 @@ export default function Vendas({ onAddBtn }) {
 
       <button className="fab" onClick={()=>openModal()}>+</button>
 
-      {modal&&(
-        <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
-          <div className="modal">
-            <div className="modal-header"><h3>{editId?'Editar venda':'Nova venda'}</h3><button className="modal-close" onClick={()=>setModal(false)}>✕</button></div>
-            <div className="form-grid">
-              <div className="form-group form-full"><label>Carga *</label>
-                <select value={form.carga_id} onChange={e=>handleCargaChange(e.target.value)}>
-                  <option value="">— Selecione a carga —</option>
-                  {cargas.map(c=>(
-                    <option key={c.carga_id} value={c.carga_id}>
-                      {fmtDate(c.data)} — 1ª: {c.saldo_primeira}cx · 2ª: {c.saldo_segunda}cx disponível
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {cargaSel&&(
-                <div className="form-group form-full">
-                  <div style={{background:'var(--bg)',borderRadius:'var(--radius-sm)',padding:'10px 14px',display:'flex',gap:16}}>
-                    <div style={{textAlign:'center'}}><div style={{fontSize:11,color:'var(--text-muted)'}}>Saldo 1ª</div><div style={{fontWeight:700,color:'var(--green)',fontSize:18}}>{cargaSel.saldo_primeira} cx</div></div>
-                    <div style={{textAlign:'center'}}><div style={{fontSize:11,color:'var(--text-muted)'}}>Saldo 2ª</div><div style={{fontWeight:700,color:'var(--amber)',fontSize:18}}>{cargaSel.saldo_segunda} cx</div></div>
-                    <div style={{textAlign:'center'}}><div style={{fontSize:11,color:'var(--text-muted)'}}>Total disponível</div><div style={{fontWeight:700,fontSize:18}}>{cargaSel.saldo_primeira+cargaSel.saldo_segunda} cx</div></div>
-                  </div>
+      {/* MODAL DETALHE */}
+      {detalhe && (
+        <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setDetalhe(null)}>
+          <div className="modal" style={{maxWidth:480}}>
+            <div className="modal-header">
+              <h3>Venda — {fmtDate(detalhe.data_venda)}</h3>
+              <button className="modal-close" onClick={()=>setDetalhe(null)}>✕</button>
+            </div>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:16}}>
+              {[
+                {label:'Cliente',      val:detalhe.comprador||'—'},
+                {label:'Condição',     val:detalhe.forma_pagamento==='avista'?'À vista':'A prazo'},
+                {label:'Vencimento',   val:detalhe.data_vencimento?fmtDate(detalhe.data_vencimento):'—'},
+                {label:'Status',       val:detalhe.status_pagamento},
+                {label:'1ª (cx)',      val:detalhe.quantidade_primeira},
+                {label:'2ª (cx)',      val:detalhe.quantidade_segunda},
+                {label:'Valor bruto',  val:fmt(detalhe.valor_total),   color:'var(--teal)'},
+                {label:'Funrural',     val:fmt(detalhe.funrural_valor), color:'var(--amber)'},
+                {label:'PTV',          val:fmt(detalhe.ptv_valor),      color:'var(--amber)'},
+                {label:'Desconto à vista', val:`${detalhe.desconto_avista_pct ?? 0}%`, color:'var(--amber)'},
+                {label:'Valor líquido',val:fmt(detalhe.valor_liquido),  color:'var(--green)'},
+              ].map(k=>(
+                <div key={k.label} style={{background:'var(--bg)',borderRadius:8,padding:'8px 10px'}}>
+                  <div style={{fontSize:10,color:'var(--text-muted)',fontWeight:600}}>{k.label}</div>
+                  <div style={{fontSize:14,fontWeight:700,color:k.color??'var(--text)',marginTop:2}}>{k.val}</div>
                 </div>
-              )}
-              <div className="form-group form-full"><label>Comprador *</label>
-                {!form.usando_novo_comprador
-                  ? <div style={{display:'flex',gap:8}}>
-                      <select value={form.client_id} onChange={e=>{
-                        const sel = compradores.find(c=>c.id===e.target.value)
-                        setForm(f=>({...f,client_id:e.target.value,comprador:sel?.nome??''}))
-                      }} style={{flex:1}}>
-                        <option value="">— Selecione o cliente —</option>
-                        {compradores.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
-                      </select>
-                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_comprador:true,client_id:'',comprador:''}))}>+ Novo</button>
-                    </div>
-                  : <div style={{display:'flex',gap:8}}>
-                      <input autoFocus value={form.comprador_novo} onChange={e=>setForm(f=>({...f,comprador_novo:e.target.value}))} placeholder="Nome ou empresa" style={{flex:1}} />
-                      <button type="button" className="btn btn-sm" onClick={()=>setForm(f=>({...f,usando_novo_comprador:false,comprador_novo:'',client_id:''}))}>← Lista</button>
-                    </div>}
-              </div>
-              <div className="form-group"><label>Qtd 1ª (cx)</label><input type="number" inputMode="numeric" value={form.quantidade_primeira} onChange={e=>setForm(f=>({...f,quantidade_primeira:e.target.value}))} /></div>
-              <div className="form-group"><label>Preço 1ª (R$/cx)</label><input type="number" inputMode="decimal" step="0.01" value={form.preco_primeira} onChange={e=>setForm(f=>({...f,preco_primeira:e.target.value}))} placeholder="0,00" /></div>
-              <div className="form-group"><label>Qtd 2ª (cx)</label><input type="number" inputMode="numeric" value={form.quantidade_segunda} onChange={e=>setForm(f=>({...f,quantidade_segunda:e.target.value}))} /></div>
-              <div className="form-group"><label>Preço 2ª (R$/cx)</label><input type="number" inputMode="decimal" step="0.01" value={form.preco_segunda} onChange={e=>setForm(f=>({...f,preco_segunda:e.target.value}))} placeholder="0,00" /></div>
-              <div className="form-group form-full"><label>Valor total</label><input className="form-readonly" readOnly value={valorTotal!==null?fmt(valorTotal):''} style={{fontWeight:600,color:'var(--green)',fontSize:18}} /></div>
-              <div className="form-group"><label>Pagamento</label>
-                <select value={form.forma_pagamento} onChange={e=>setForm(f=>({...f,forma_pagamento:e.target.value,dias_prazo:'',data_vencimento:'',conta_vista_id:''}))}>
-                  <option value="a_vista">À vista</option><option value="a_prazo">A prazo</option>
-                </select>
-              </div>
-              {form.forma_pagamento==='a_vista'&&(
-                <div className="form-group"><label>Conta que recebeu</label>
-                  <select value={form.conta_vista_id??''} onChange={e=>setForm(f=>({...f,conta_vista_id:e.target.value}))}>
-                    <option value="">— Opcional —</option>
-                    {contas.map(c=><option key={c.id} value={c.id}>{tipoIconConta[c.tipo]??'🏦'} {c.nome} — {fmt(c.saldo_atual)}</option>)}
-                  </select>
-                </div>
-              )}
-              {form.forma_pagamento==='a_prazo'&&<>
-                <div className="form-group"><label>Prazo (dias)</label><input type="number" inputMode="numeric" value={form.dias_prazo} onChange={e=>handleDiasPrazo(e.target.value)} placeholder="30" /></div>
-                <div className="form-group form-full"><label>Vencimento</label><input className="form-readonly" readOnly value={form.data_vencimento?fmtDate(form.data_vencimento):''} style={{fontWeight:600,color:'var(--amber)'}} /></div>
-              </>}
-              <div className="form-group form-full"><label>Observações</label><textarea value={form.observacoes} onChange={e=>setForm(f=>({...f,observacoes:e.target.value}))} /></div>
+              ))}
             </div>
             <div className="modal-footer">
-              <button className="btn" onClick={()=>setModal(false)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={save} disabled={saving} style={{flex:1}}>{saving?'Salvando...':editId?'✓ Salvar':'✓ Registrar venda'}</button>
+              <button className="btn" onClick={()=>setDetalhe(null)}>Fechar</button>
+              <button className="btn btn-primary" onClick={()=>{setDetalhe(null);openModal(detalhe)}}>✎ Editar</button>
             </div>
           </div>
         </div>
       )}
 
-      {modalReceber&&(
+      {/* MODAL RECEBER */}
+      {modalReceber && (
         <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModalReceber(null)}>
-          <div className="modal" style={{maxWidth:420}}>
-            <div className="modal-header"><h3>Confirmar recebimento</h3><button className="modal-close" onClick={()=>setModalReceber(null)}>✕</button></div>
-            <div style={{background:'var(--teal-light)',borderRadius:'var(--radius-sm)',padding:'12px 14px',marginBottom:16}}>
-              <div style={{fontSize:12,color:'var(--teal)',marginBottom:4}}>Venda de {modalReceber.comprador}</div>
-              <div style={{fontSize:22,fontWeight:700,color:'var(--teal)'}}>{fmt(modalReceber.valor_total)}</div>
+          <div className="modal" style={{maxWidth:400}}>
+            <div className="modal-header">
+              <h3>💰 Confirmar recebimento</h3>
+              <button className="modal-close" onClick={()=>setModalReceber(null)}>✕</button>
             </div>
-            <div className="form-grid">
-              <div className="form-group form-full"><label>Conta que recebeu *</label>
-                <select value={recContaId} onChange={e=>setRecContaId(e.target.value)}>
-                  <option value="">— Selecione —</option>
-                  {contas.map(c=><option key={c.id} value={c.id}>{tipoIconConta[c.tipo]??'🏦'} {c.nome} — {fmt(c.saldo_atual)}</option>)}
+            <div style={{marginBottom:16}}>
+              <div style={{background:'var(--bg)',borderRadius:8,padding:'10px 14px',marginBottom:14}}>
+                <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:4}}>Venda de {fmtDate(modalReceber.data_venda)}</div>
+                <div style={{fontSize:18,fontWeight:700,color:'var(--green)'}}>{fmt(modalReceber.valor_liquido)}</div>
+                <div style={{fontSize:12,color:'var(--text-muted)',marginTop:2}}>{modalReceber.comprador}</div>
+              </div>
+              <div className="form-group">
+                <label>Conta que receberá o valor *</label>
+                <select value={contaReceber} onChange={e=>setContaReceber(e.target.value)}>
+                  <option value="">— Selecione a conta —</option>
+                  {contas.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
                 </select>
               </div>
-              <div className="form-group form-full"><label>Data do recebimento</label><input type="date" value={recData} onChange={e=>setRecData(e.target.value)} /></div>
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={()=>setModalReceber(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={confirmarReceber} disabled={saving} style={{flex:1}}>{saving?'Confirmando...':'✓ Confirmar recebimento'}</button>
+              <button className="btn btn-primary" onClick={receberVenda} disabled={salvandoRec} style={{flex:1}}>
+                {salvandoRec?'Salvando...':'✅ Confirmar recebimento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CRIAR/EDITAR */}
+      {modal && (
+        <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModal(false)}>
+          <div className="modal" style={{maxWidth:640}}>
+            <div className="modal-header">
+              <h3>{editId?'Editar venda':'Nova venda'}</h3>
+              <button className="modal-close" onClick={()=>setModal(false)}>✕</button>
+            </div>
+
+            <div className="form-grid">
+              <div className="form-group form-full">
+                <label>Carga *</label>
+                <select value={form.carga_id} onChange={e=>{setForm(f=>({...f,carga_id:e.target.value}));carregarItens(e.target.value)}}>
+                  <option value="">— Selecione a carga —</option>
+                  {cargas.map(c=>(
+                    <option key={c.carga_id} value={c.carga_id}>
+                      {fmtDate(c.data)} — {Number((c.total_primeira||0)+(c.total_segunda||0)).toLocaleString('pt-BR')} cx
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group form-full">
+                <label>Cliente *</label>
+                <select value={form.client_id} onChange={e=>setForm(f=>({...f,client_id:e.target.value}))}>
+                  <option value="">— Selecione o cliente —</option>
+                  {clientes.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Data da venda *</label>
+                <input type="date" value={form.data_venda} onChange={e=>setForm(f=>({...f,data_venda:e.target.value}))}/>
+              </div>
+              <div className="form-group">
+                <label>Condição de pagamento</label>
+                <select value={form.condicao} onChange={e=>setForm(f=>({...f,condicao:e.target.value}))}>
+                  <option value="avista">À vista</option>
+                  <option value="prazo">A prazo</option>
+                </select>
+              </div>
+              {form.condicao==='prazo' && (
+                <>
+                  <div className="form-group">
+                    <label>Prazo (dias)</label>
+                    <input type="number" min="1" value={form.prazo_dias} onChange={e=>setForm(f=>({...f,prazo_dias:e.target.value}))} placeholder="30"/>
+                  </div>
+                  <div className="form-group">
+                    <label>Vencimento calculado</label>
+                    <input value={dataVencimento?fmtDate(dataVencimento):'—'} readOnly style={{background:'var(--bg)',color:'var(--amber)',fontWeight:600}}/>
+                  </div>
+                </>
+              )}
+              <div className="form-group">
+                <label>Funrural (%)</label>
+                <input type="number" step="0.01" value={form.funrural_pct} onChange={e=>setForm(f=>({...f,funrural_pct:e.target.value}))} placeholder="1.5"/>
+              </div>
+              <div className="form-group">
+                <label>PTV (R$)</label>
+                <input type="number" step="0.01" value={form.ptv_valor} onChange={e=>setForm(f=>({...f,ptv_valor:e.target.value}))} placeholder="0.00"/>
+              </div>
+              <div className="form-group">
+                <label>Desconto à vista (%)</label>
+                <input type="number" step="0.01" value={form.desconto_avista_pct} onChange={e=>setForm(f=>({...f,desconto_avista_pct:e.target.value}))} placeholder="ex: 2.5"/>
+              </div>
+              <div className="form-group form-full">
+                <label>Observações</label>
+                <input value={form.observacoes} onChange={e=>setForm(f=>({...f,observacoes:e.target.value}))}/>
+              </div>
+            </div>
+
+            {/* Conta — só aparece com check */}
+            <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:form.marcar_recebido?10:0}}>
+                <input type="checkbox" id="chk-rec" checked={form.marcar_recebido}
+                  onChange={e=>setForm(f=>({...f,marcar_recebido:e.target.checked}))}
+                  style={{width:18,height:18,cursor:'pointer'}}/>
+                <label htmlFor="chk-rec" style={{fontWeight:600,fontSize:13,cursor:'pointer'}}>💰 Já recebi — informar conta</label>
+              </div>
+              {form.marcar_recebido && (
+                <select value={form.conta_financeira_id} onChange={e=>setForm(f=>({...f,conta_financeira_id:e.target.value}))}>
+                  <option value="">— Selecione a conta —</option>
+                  {contas.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
+                </select>
+              )}
+            </div>
+
+            {/* Itens com preço */}
+            {itensVenda.length > 0 && (
+              <div style={{marginBottom:14}}>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:10,borderTop:'1px solid var(--border)',paddingTop:14}}>
+                  💰 Preço por lote/setor
+                </div>
+                {itensVenda.map((it, idx) => {
+                  const val1 = it.qtd1*it.peso1*it.preco_kg1
+                  const val2 = it.qtd2*it.peso2*it.preco_kg2
+                  const setorLabel = it.setor_nome ? (it.variedade?`${it.setor_nome} — ${it.variedade}`:it.setor_nome) : ''
+                  return (
+                    <div key={idx} style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px',marginBottom:8}}>
+                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:8}}>
+                        <div>
+                          <span style={{fontWeight:700,fontSize:13}}>{it.lote_nome}</span>
+                          {setorLabel&&<span style={{fontSize:11,color:'var(--text-muted)',marginLeft:8}}>{setorLabel}</span>}
+                        </div>
+                        <span style={{fontSize:12,fontWeight:700,color:'var(--teal)'}}>{fmt(val1+val2)}</span>
+                      </div>
+                      {it.qtd1 > 0 && (
+                        <div style={{display:'flex',gap:8,alignItems:'center',marginBottom:6,flexWrap:'wrap'}}>
+                          <span style={{fontSize:11,background:'#EAF3DE',color:'var(--green)',borderRadius:4,padding:'1px 6px',fontWeight:600}}>1ª</span>
+                          <span style={{fontSize:12,color:'var(--text-muted)'}}>{it.qtd1} cx × {it.peso1} kg/cx = {(it.qtd1*it.peso1).toFixed(0)} kg</span>
+                          <div className="form-group" style={{marginBottom:0,flex:1,minWidth:100}}>
+                            <label style={{fontSize:10}}>Preço/kg (R$)</label>
+                            <input type="number" step="0.001" value={it.preco_kg1}
+                              onChange={e=>updItem(idx,'preco_kg1',parseFloat(e.target.value)||0)} placeholder="0.000"/>
+                          </div>
+                          {val1>0&&<span style={{fontSize:13,fontWeight:700,color:'var(--green)'}}>{fmt(val1)}</span>}
+                        </div>
+                      )}
+                      {it.qtd2 > 0 && (
+                        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                          <span style={{fontSize:11,background:'#FAEEDA',color:'var(--amber)',borderRadius:4,padding:'1px 6px',fontWeight:600}}>2ª</span>
+                          <span style={{fontSize:12,color:'var(--text-muted)'}}>{it.qtd2} cx × {it.peso2} kg/cx = {(it.qtd2*it.peso2).toFixed(0)} kg</span>
+                          <div className="form-group" style={{marginBottom:0,flex:1,minWidth:100}}>
+                            <label style={{fontSize:10}}>Preço/kg (R$)</label>
+                            <input type="number" step="0.001" value={it.preco_kg2}
+                              onChange={e=>updItem(idx,'preco_kg2',parseFloat(e.target.value)||0)} placeholder="0.000"/>
+                          </div>
+                          {val2>0&&<span style={{fontSize:13,fontWeight:700,color:'var(--amber)'}}>{fmt(val2)}</span>}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Resumo */}
+            {totais.bruto > 0 && (
+              <div style={{background:'var(--bg)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
+                <div style={{fontWeight:600,fontSize:12,color:'var(--text-muted)',textTransform:'uppercase',marginBottom:10}}>Resumo</div>
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:13}}>
+                    <span>Valor bruto</span>
+                    <span style={{color:'var(--teal)',fontWeight:600}}>{fmt(totais.bruto)}</span>
+                  </div>
+                  {totais.funrural>0&&(
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'var(--amber)'}}>
+                      <span>Funrural ({form.funrural_pct}%)</span>
+                      <span>− {fmt(totais.funrural)}</span>
+                    </div>
+                  )}
+                  {totais.ptv>0&&(
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'var(--amber)'}}>
+                      <span>PTV</span><span>− {fmt(totais.ptv)}</span>
+                    </div>
+                  )}
+                  {totais.desconto>0&&(
+                    <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'var(--amber)'}}>
+                      <span>Desconto à vista ({form.desconto_avista_pct}%)</span><span>− {fmt(totais.desconto)}</span>
+                    </div>
+                  )}
+                  <div style={{display:'flex',justifyContent:'space-between',fontSize:15,fontWeight:700,color:'var(--green)',borderTop:'1px solid var(--border)',paddingTop:8}}>
+                    <span>Valor líquido</span>
+                    <span>{fmt(totais.liquido)}</span>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:4}}>
+                    {form.condicao==='avista'?'✅ À vista — lançado como recebido':`⏳ A prazo — vence em ${dataVencimento?fmtDate(dataVencimento):'...'}`}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="modal-footer">
+              <button className="btn" onClick={()=>setModal(false)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={save} disabled={saving} style={{flex:1}}>
+                {saving?'Salvando...':editId?'✓ Salvar alterações':'✓ Registrar venda'}
+              </button>
             </div>
           </div>
         </div>

@@ -1,0 +1,2 @@
+id,tenant_id,nome,apelido,cpf_cnpj,telefone,email,cidade,estado,categoria,observacoes,ativo,deleted_at,criado_em,atualizado_em
+31bc6975-96cf-42e5-b299-968037613795,00000000-0000-0000-0000-000000000001,ADUBOS REAL,,,,,,MG,insumos,,true,,2026-05-11T14:01:25.739319+00:00,2026-05-11T14:01:25.739319+00:00

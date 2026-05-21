@@ -28,6 +28,9 @@ const EMPTY = {
 export default function Culturas({ onAddBtn }) {
   const [culturas, setCulturas]   = useState([])
   const [lucros, setLucros]       = useState({})
+  const [varCad, setVarCad]         = useState([])
+  const [modalVars, setModalVars]   = useState(null)
+  const [variedades, setVariedades] = useState({}) // cultura_id → lista de variedades
   const [loading, setLoading]     = useState(true)
   const [modal, setModal]         = useState(false)
   const [detalhe, setDetalhe]     = useState(null)
@@ -42,12 +45,27 @@ export default function Culturas({ onAddBtn }) {
 
   async function load() {
     setLoading(true)
-    const [{ data: cs }, { data: ls }] = await Promise.all([
+    const [{ data: cs }, { data: ls }, { data: vs }, { data: vcad }] = await Promise.all([
       supabase.from('culturas').select('*').is('deleted_at', null).order('nome'),
       supabase.from('vw_lucro_por_cultura').select('*'),
+      supabase.from('setores').select('variedade, lote_id').not('variedade', 'is', null).neq('variedade', ''),
+      supabase.from('variedades_cadastradas').select('*').order('nome'),
     ])
     setCulturas(cs ?? [])
     const m = {}; (ls ?? []).forEach(r => { m[r.cultura_id] = r }); setLucros(m)
+    // Agrupa variedades por cultura_id
+    const varMap = {}
+    ;(vs ?? []).forEach(s => {
+      const cid = s.cultura
+      if (!cid) return
+      if (!cid || !varMap[cid]) { if(cid) varMap[cid] = new Set(); else return; }
+      varMap[cid].add(s.variedade)
+    })
+    // Converte sets para arrays
+    const varObj = {}
+    Object.entries(varMap).forEach(([k, v]) => { varObj[k] = [...v].sort() })
+    setVariedades(varObj)
+    setVarCad(vcad ?? [])
     setLoading(false)
   }
 
@@ -94,11 +112,6 @@ export default function Culturas({ onAddBtn }) {
   }
 
   async function excluir(id) {
-    const { data: lts } = await supabase.from('lotes').select('nome').eq('cultura_id', id).is('deleted_at', null)
-    if (lts?.length) {
-      const nomes = lts.map(l => `• ${l.nome}`).join('\n')
-      return alert(`Não é possível excluir esta cultura.\n\nLotes vinculados (${lts.length}):\n${nomes}\n\nDesvincule ou exclua os lotes antes.`)
-    }
     if (!window.confirm('Excluir esta cultura permanentemente? Esta ação não pode ser desfeita.')) return
     await supabase.from('culturas').update({ deleted_at: new Date().toISOString() }).eq('id', id)
     load()
@@ -150,7 +163,7 @@ export default function Culturas({ onAddBtn }) {
           const lucro = Number(l.lucro_total ?? 0)
           const rec   = Number(l.receita_liquida ?? 0)
           return (
-            <div key={c.id} className="card" style={{ marginBottom:0, cursor:'pointer', opacity: c.ativo ? 1 : 0.55 }}
+            <div key={c.id} className="card" style={{ marginBottom:0, cursor:'pointer', opacity: c.ativo ? 1 : 0.55, overflow:'hidden', wordBreak:'break-word' }}
               onClick={() => setDetalhe(c)}>
               <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
                 <div style={{ fontSize:32 }}>{c.icone}</div>
@@ -181,6 +194,20 @@ export default function Culturas({ onAddBtn }) {
                 </div>
               )}
 
+              {/* Variedades */}
+              {(lucros[c.id]?.variedades) ? (
+                <div style={{ marginBottom:8 }}>
+                  <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', marginBottom:4 }}>Variedades</div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, overflow:'hidden' }}>
+                    {(lucros[c.id]?.variedades || '').split(', ').filter(Boolean).map(v => (
+                      <span key={v} style={{ fontSize:11, background:'var(--green-light)', color:'var(--green)', borderRadius:4, padding:'2px 8px', fontWeight:600 }}>{v}</span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:8, fontStyle:'italic' }}>Sem variedades cadastradas</div>
+              )}
+
               {/* Lotes vinculados */}
               {(() => {
                 const l = lucros[c.id] ?? {}
@@ -197,6 +224,7 @@ export default function Culturas({ onAddBtn }) {
 
               <div style={{ display:'flex', gap:6, marginTop:10 }} onClick={e => e.stopPropagation()}>
                 <button className="btn btn-sm" style={{ flex:1 }} onClick={() => openModal(c)}>✎ Editar</button>
+                <button className="btn btn-sm" style={{ background:'#EAF3DE', color:'#2d6a2d' }} onClick={() => setModalVars(c)}>🌱 Variedades</button>
                 <button className="btn btn-sm" style={{ background: c.ativo ? 'var(--amber-light)' : 'var(--green-light)', color: c.ativo ? 'var(--amber)' : 'var(--green)', borderColor:'transparent' }}
                   onClick={() => toggleAtivo(c)}>{c.ativo ? '⏸' : '▶'}</button>
                 <button className="btn btn-sm btn-danger" onClick={() => excluir(c.id)}>✕</button>
@@ -264,6 +292,17 @@ export default function Culturas({ onAddBtn }) {
                   )}
 
                   {detalhe.descricao && <p style={{ fontSize:13, color:'var(--text-muted)', marginBottom:14 }}>{detalhe.descricao}</p>}
+
+                  {variedades[detalhe.id]?.length > 0 && (
+                    <div style={{ background:'var(--bg)', borderRadius:8, padding:'10px 14px', marginBottom:14 }}>
+                      <div style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', marginBottom:8 }}>🌿 Variedades cadastradas</div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                        {variedades[detalhe.id].map(v => (
+                          <span key={v} style={{ fontSize:13, background:'var(--green-light)', color:'var(--green)', borderRadius:6, padding:'4px 10px', fontWeight:600 }}>{v}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               )
             })()}
@@ -361,6 +400,58 @@ export default function Culturas({ onAddBtn }) {
               <button className="btn btn-primary" onClick={save} disabled={saving} style={{ flex:1 }}>
                 {saving ? 'Salvando...' : editId ? '✓ Salvar alterações' : '✓ Criar cultura'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Variedades */}
+      {modalVars && (
+        <div className="modal-backdrop" onClick={e => e.target===e.currentTarget && setModalVars(null)}>
+          <div className="modal" style={{ maxWidth:420 }}>
+            <div className="modal-header">
+              <h3>{modalVars.icone} Variedades — {modalVars.nome}</h3>
+              <button className="modal-close" onClick={() => setModalVars(null)}>✕</button>
+            </div>
+            <div style={{ marginBottom:14 }}>
+              {varCad.filter(v => v.cultura === modalVars.nome).length === 0
+                ? <div style={{ textAlign:'center', padding:16, color:'var(--text-muted)', fontSize:13 }}>Nenhuma variedade cadastrada.</div>
+                : varCad.filter(v => v.cultura === modalVars.nome).map(v => (
+                  <div key={v.id} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 12px', background:'var(--bg)', borderRadius:8, marginBottom:6 }}>
+                    <span style={{ fontSize:13, fontWeight:600, background:'#EAF3DE', color:'#2d6a2d', borderRadius:6, padding:'2px 10px' }}>{v.nome}</span>
+                    <button className="btn btn-sm btn-danger" onClick={async () => {
+                      if (!window.confirm('Apagar "' + v.nome + '"?')) return
+                      await supabase.from('variedades_cadastradas').delete().eq('id', v.id)
+                      setVarCad(prev => prev.filter(x => x.id !== v.id))
+                    }}>✕</button>
+                  </div>
+                ))
+              }
+            </div>
+            <div style={{ borderTop:'1px solid var(--border)', paddingTop:12 }}>
+              <label style={{ fontSize:12, fontWeight:600, color:'var(--text-muted)', display:'block', marginBottom:8 }}>Nova variedade</label>
+              <div style={{ display:'flex', gap:6 }}>
+                <input id="inputVarModal" placeholder="ex: PRATA ANÃ..." style={{ flex:1, fontSize:13 }}
+                  onKeyDown={async e => {
+                    if (e.key !== 'Enter') return
+                    const nome = e.target.value.trim().toUpperCase()
+                    if (!nome) return
+                    const { data } = await supabase.from('variedades_cadastradas').insert({ nome, cultura: modalVars.nome }).select().single()
+                    if (data) { setVarCad(prev => [...prev, data]); e.target.value = '' }
+                  }}
+                />
+                <button className="btn btn-sm" style={{ background:'var(--green)', color:'white' }}
+                  onClick={async () => {
+                    const input = document.getElementById('inputVarModal')
+                    const nome = input?.value?.trim().toUpperCase()
+                    if (!nome) return
+                    const { data } = await supabase.from('variedades_cadastradas').insert({ nome, cultura: modalVars.nome }).select().single()
+                    if (data) { setVarCad(prev => [...prev, data]); input.value = '' }
+                  }}>+ Add</button>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" style={{ flex:1 }} onClick={() => setModalVars(null)}>Fechar</button>
             </div>
           </div>
         </div>
