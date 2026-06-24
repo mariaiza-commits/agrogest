@@ -35,7 +35,11 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
+    // Timeout de segurança: se Supabase não responder em 8s, libera o app
+    const timeout = setTimeout(() => setLoading(false), 8000)
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(timeout)
       if (session?.user) {
         setUser(session.user)
         const list = await loadTenants(session.user.id)
@@ -44,6 +48,7 @@ export function AuthProvider({ children }) {
       }
       setLoading(false)
     }).catch(() => {
+      clearTimeout(timeout)
       setLoading(false)
     })
 
