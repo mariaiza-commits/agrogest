@@ -223,6 +223,12 @@ tbody tr:hover td { background: var(--gray-50); }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
 .section-header h3 { font-size: 14px; font-weight: 600; }
 
+/* ─── LOGIN ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .login-panel        { display: none !important; }
+  .login-logo-mobile  { display: block !important; }
+}
+
 /* ─── RESPONSIVE ─────────────────────────────────── */
 @media (max-width: 900px) {
   .chart-grid   { grid-template-columns: 1fr; }

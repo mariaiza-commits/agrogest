@@ -1,11 +1,13 @@
 ﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, today } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 const TIPOS = ['Adubação','Irrigação','Pulverização','Capina','Poda','Colheita','Outro']
 const EMPTY = { lote_id:'', setor_id:'', data:today(), tipo_atividade:'Adubação', observacoes:'' }
 
 export default function Atividades({ onAddBtn }) {
+  const { tenantId } = useAuth()
   const [lotes, setLotes]       = useState([])
   const [setores, setSetores]   = useState([])
   const [insumos, setInsumos]   = useState([])
@@ -85,7 +87,7 @@ export default function Atividades({ onAddBtn }) {
     if (editId) {
       await supabase.from('atividades_lote').update(payload).eq('id',editId)
     } else {
-      const { data } = await supabase.from('atividades_lote').insert(payload).select().single()
+      const { data } = await supabase.from('atividades_lote').insert({ ...payload, tenant_id: tenantId }).select().single()
       atvId = data?.id
     }
     // Salva insumos usados (apenas no insert)
@@ -94,7 +96,8 @@ export default function Atividades({ onAddBtn }) {
       for (const l of linhasValidas) {
         await supabase.from('atividade_insumos').insert({
           atividade_id:atvId, insumo_id:l.insumo_id,
-          quantidade:parseFloat(l.quantidade), custo_unitario:parseFloat(l.custo_unitario)||0
+          quantidade:parseFloat(l.quantidade), custo_unitario:parseFloat(l.custo_unitario)||0,
+          tenant_id: tenantId,
         })
       }
     }

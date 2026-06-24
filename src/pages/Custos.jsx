@@ -1,6 +1,7 @@
 ﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, statusBadge, today, BtnExportar } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 const EMPTY = { lote_id:'', data:today(), categoria_id:'', descricao:'', fornecedor:'', fornecedor_novo:'', usando_novo_forn:false, valor:'', status_pagamento:'pendente', dias_prazo:'', data_vencimento:'', tipo_parcelamento:'avista', num_parcelas:'', num_meses:'', observacoes:'' }
 const COLS_EXPORT = [
@@ -15,6 +16,7 @@ const COLS_EXPORT = [
 ]
 
 export default function Custos({ onAddBtn }) {
+  const { tenantId } = useAuth()
   const [lotes, setLotes]           = useState([])
   const [categorias, setCategorias] = useState([])
   const [custos, setCustos]         = useState([])
@@ -100,7 +102,7 @@ export default function Custos({ onAddBtn }) {
 
   async function salvarCategoria() {
     if (!novaCat.trim()) return
-    const {data}=await supabase.from('categorias').insert({nome:novaCat.trim(),tipo:'custo'}).select().single()
+    const {data}=await supabase.from('categorias').insert({nome:novaCat.trim(),tipo:'custo',tenant_id:tenantId}).select().single()
     if (data){setCategorias(c=>[...c,data].sort((a,b)=>a.nome.localeCompare(b.nome)));setForm(f=>({...f,categoria_id:data.id}))}
     setNovaCat('');setModalCat(false)
   }
@@ -118,11 +120,11 @@ export default function Custos({ onAddBtn }) {
     if (editId){
       await supabase.from('custos').update({...base,valor:parseFloat(form.valor),status_pagamento:form.status_pagamento,data_vencimento:form.data_vencimento||null}).eq('id',editId)
     } else if (form.tipo_parcelamento==='parcelado'&&parseInt(form.num_parcelas)>1){
-      await supabase.rpc('fn_gerar_parcelas_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor_total:parseFloat(form.valor),p_num_parcelas:parseInt(form.num_parcelas),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null})
+      await supabase.rpc('fn_gerar_parcelas_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor_total:parseFloat(form.valor),p_num_parcelas:parseInt(form.num_parcelas),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId})
     } else if (form.tipo_parcelamento==='mensal'&&parseInt(form.num_meses)>1){
-      await supabase.rpc('fn_gerar_mensal_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor:parseFloat(form.valor),p_num_meses:parseInt(form.num_meses),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null})
+      await supabase.rpc('fn_gerar_mensal_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor:parseFloat(form.valor),p_num_meses:parseInt(form.num_meses),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId})
     } else {
-      await supabase.from('custos').insert({...base,valor:parseFloat(form.valor),status_pagamento:form.status_pagamento,data_vencimento:form.data_vencimento||null,tipo_parcelamento:'avista'})
+      await supabase.from('custos').insert({...base,valor:parseFloat(form.valor),status_pagamento:form.status_pagamento,data_vencimento:form.data_vencimento||null,tipo_parcelamento:'avista',tenant_id:tenantId})
     }
     setSaving(false);closeModal();load()
   }

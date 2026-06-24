@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 const EMPTY = { nome:'', telefone:'', email:'', cpf_cnpj:'', observacoes:'' }
 
 export default function Clientes({ onAddBtn }) {
+  const { tenantId } = useAuth()
   const [clientes, setClientes] = useState([])
   const [loading, setLoading]   = useState(true)
   const [modal, setModal]       = useState(false)
@@ -45,7 +47,7 @@ export default function Clientes({ onAddBtn }) {
     if (editId) {
       await supabase.from('clients').update(payload).eq('id', editId)
     } else {
-      await supabase.from('clients').insert(payload)
+      await supabase.from('clients').insert({ ...payload, tenant_id: tenantId })
     }
     setSaving(false); setModal(false); load()
   }

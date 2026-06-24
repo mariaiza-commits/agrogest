@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function Vendas({ onAddBtn }) {
+  const { tenantId } = useAuth()
   const [vendas, setVendas]     = useState([])
   const [cargas, setCargas]     = useState([])
   const [clientes, setClientes] = useState([])
@@ -145,6 +147,7 @@ export default function Vendas({ onAddBtn }) {
         p_observacoes:     form.observacoes || null,
         p_status:          form.marcar_recebido ? 'recebido' : status,
         p_conta_id:        form.marcar_recebido ? form.conta_financeira_id || null : null,
+        p_tenant_id:       tenantId,
         p_itens:           itensVenda.map(it => ({
           carga_item_id: it.carga_item_id,
           qtd1: it.qtd1, qtd2: it.qtd2,

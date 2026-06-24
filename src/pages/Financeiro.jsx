@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, statusBadge, today, BtnExportar } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 function VencBadge({ dataVenc, status }) {
   if (!dataVenc) return <span style={{color:'var(--text-muted)',fontSize:12}}>—</span>
@@ -109,6 +110,7 @@ const COLS_FLUXO = [
 ]
 
 export default function Financeiro() {
+  const { tenantId } = useAuth()
   const [aba,setAba]         = useState('contas')
   const [contas,setContas]   = useState([])
   const [fluxo,setFluxo]     = useState([])
@@ -171,7 +173,8 @@ export default function Financeiro() {
       origem: 'ajuste',
       valor: parseFloat(ajusteValor),
       data: new Date().toISOString().split('T')[0],
-      descricao: 'Ajuste manual de saldo'
+      descricao: 'Ajuste manual de saldo',
+      tenant_id: tenantId,
     })
     setModalAjuste(null); setAjusteValor(''); load()
   }
@@ -185,7 +188,8 @@ export default function Financeiro() {
       p_destino_id: tDestino,
       p_valor: parseFloat(tValor),
       p_data: tData,
-      p_descricao: tDesc || 'Transferência'
+      p_descricao: tDesc || 'Transferência',
+      p_tenant_id: tenantId,
     })
     if (error) { alert('Erro: ' + error.message); setTransf(false); return }
     setTransf(false); setTValor(''); load()
@@ -194,7 +198,7 @@ export default function Financeiro() {
   async function salvarConta() {
     if (!formConta.nome) return alert('Informe o nome da conta.')
     if (editContaId) await supabase.from('contas_financeiras').update(formConta).eq('id',editContaId)
-    else await supabase.from('contas_financeiras').insert(formConta)
+    else await supabase.from('contas_financeiras').insert({ ...formConta, tenant_id: tenantId })
     setModalConta(false); setEditContaId(null); setFormConta({nome:'',tipo:'banco'}); load()
   }
 

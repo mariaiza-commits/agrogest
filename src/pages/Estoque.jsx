@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, today, BtnExportar } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 const EMPTY_INS = { nome:'', unidade:'kg', categoria:'Insumos', estoque_minimo:'', observacoes:'' }
 const EMPTY_MOV = { insumo_id:'', tipo:'entrada', quantidade:'', custo_unitario:'', data:today(), observacoes:'' }
@@ -22,6 +23,7 @@ const COLS_MOV = [
 ]
 
 export default function Estoque({ onAddBtn }) {
+  const { tenantId } = useAuth()
   const [insumos, setInsumos]   = useState([])
   const [alertas, setAlertas]   = useState([])
   const [movs, setMovs]         = useState([])
@@ -65,7 +67,7 @@ export default function Estoque({ onAddBtn }) {
     setSaving(true)
     const payload = {nome:formIns.nome,unidade:formIns.unidade,categoria:formIns.categoria,estoque_minimo:parseFloat(formIns.estoque_minimo)||0,observacoes:formIns.observacoes||null}
     if (editInsId) await supabase.from('insumos').update(payload).eq('id',editInsId)
-    else await supabase.from('insumos').insert(payload)
+    else await supabase.from('insumos').insert({ ...payload, tenant_id: tenantId })
     setSaving(false); setModalIns(false); setEditInsId(null); load()
   }
 
@@ -76,7 +78,7 @@ export default function Estoque({ onAddBtn }) {
     if (editMovId) {
       await supabase.from('movimentacoes_estoque').update(payload).eq('id',editMovId)
     } else {
-      await supabase.from('movimentacoes_estoque').insert(payload)
+      await supabase.from('movimentacoes_estoque').insert({ ...payload, tenant_id: tenantId })
     }
     setSaving(false); setModalMov(false); setEditMovId(null); load()
   }

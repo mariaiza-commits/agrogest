@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtDate, today } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 const TIPOS = ['Adubação','Irrigação','Pulverização','Capina','Poda','Colheita','Outro']
 const EMPTY = { lote_id:'', setor_id:'', tipo_atividade:'Adubação', insumo_id:'', frequencia_dias:'30', data_inicio:today(), proxima_execucao:today(), ativo:true, observacoes:'' }
 
 export default function Programacao({ onAddBtn }) {
+  const { tenantId } = useAuth()
   const [lotes, setLotes]     = useState([])
   const [setores, setSetores] = useState([])
   const [insumos, setInsumos] = useState([])
@@ -56,7 +58,7 @@ export default function Programacao({ onAddBtn }) {
     setSaving(true)
     const payload = { lote_id:form.lote_id, setor_id:form.setor_id||null, tipo_atividade:form.tipo_atividade, insumo_id:form.insumo_id||null, frequencia_dias:parseInt(form.frequencia_dias), data_inicio:form.data_inicio, proxima_execucao:form.proxima_execucao, ativo:form.ativo, observacoes:form.observacoes||null }
     if (editId) await supabase.from('programacao_atividades').update(payload).eq('id',editId)
-    else await supabase.from('programacao_atividades').insert(payload)
+    else await supabase.from('programacao_atividades').insert({ ...payload, tenant_id: tenantId })
     setSaving(false); closeModal(); load()
   }
 

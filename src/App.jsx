@@ -1,5 +1,12 @@
 import React, { useState, useRef, lazy, Suspense } from 'react'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
+import TenantSelector from './pages/TenantSelector'
+import {
+  LayoutDashboard, Map, Leaf, Wheat, Wrench, CalendarDays,
+  Package, ShoppingCart, TrendingDown, Landmark, Users, Factory,
+  BarChart2, LogOut, ChevronRight, Menu, X
+} from 'lucide-react'
 
 function useIsMobile(bp) {
   const [m, setM] = React.useState(() => window.innerWidth < (bp || 768))
@@ -29,7 +36,7 @@ const PAGE_LABELS = {
   Dashboard:'Dashboard', Lotes:'Lotes / Piquetes', Culturas:'Culturas',
   Producao:'Produção', Atividades:'Atividades', Programacao:'Programação',
   Estoque:'Estoque', Vendas:'Vendas', Custos:'Custos', Financeiro:'Financeiro',
-  Clientes:'Clientes', Fornecedores:'Fornecedores',
+  Clientes:'Clientes', Fornecedores:'Fornecedores', Relatorios:'Relatórios',
 }
 
 const ADD_LABELS = {
@@ -39,50 +46,71 @@ const ADD_LABELS = {
   Clientes:'+ Novo cliente', Fornecedores:'+ Novo fornecedor',
 }
 
+const DESKTOP_NAV = [
+  {
+    section: null,
+    items: [
+      { Icon: LayoutDashboard, label:'Dashboard', page:'Dashboard' },
+    ]
+  },
+  {
+    section: 'Campo',
+    items: [
+      { Icon: Map,         label:'Lotes / Piquetes', page:'Lotes' },
+      { Icon: Leaf,        label:'Culturas',          page:'Culturas' },
+      { Icon: Wheat,       label:'Produção',           page:'Producao' },
+      { Icon: Wrench,      label:'Atividades',         page:'Atividades' },
+      { Icon: CalendarDays,label:'Programação',        page:'Programacao' },
+    ]
+  },
+  {
+    section: 'Financeiro',
+    items: [
+      { Icon: ShoppingCart,  label:'Vendas',      page:'Vendas' },
+      { Icon: TrendingDown,  label:'Custos',      page:'Custos' },
+      { Icon: Landmark,      label:'Financeiro',  page:'Financeiro' },
+    ]
+  },
+  {
+    section: 'Geral',
+    items: [
+      { Icon: Package,  label:'Estoque',      page:'Estoque' },
+      { Icon: Users,    label:'Clientes',     page:'Clientes' },
+      { Icon: Factory,  label:'Fornecedores', page:'Fornecedores' },
+      { Icon: BarChart2,label:'Relatórios',   page:'Relatorios' },
+    ]
+  },
+]
+
+// flat list for mobile tabs
+const MOBILE_TABS = [
+  { id:'hoje',       Icon: LayoutDashboard, label:'Hoje',       page:'Dashboard' },
+  { id:'campo',      Icon: Wheat,           label:'Campo',      sheet:'campo',      pages:['Lotes','Culturas','Producao','Atividades','Programacao'] },
+  { id:'financeiro', Icon: Landmark,        label:'Financeiro', sheet:'financeiro', pages:['Vendas','Custos','Financeiro'] },
+  { id:'estoque',    Icon: Package,         label:'Estoque',    page:'Estoque' },
+  { id:'mais',       Icon: Menu,            label:'Mais',       sheet:'mais',       pages:['Clientes','Fornecedores','Estoque','Relatorios'] },
+]
+
 const SHEETS = {
   campo: { label:'Campo', items:[
-    { icon:'🗺️', label:'Lotes / Piquetes', page:'Lotes' },
-    { icon:'🌱', label:'Culturas', page:'Culturas' },
-    { icon:'🌾', label:'Produção', page:'Producao' },
-    { icon:'🔧', label:'Atividades', page:'Atividades' },
-    { icon:'📆', label:'Programação', page:'Programacao' },
+    { Icon: Map,          label:'Lotes / Piquetes', page:'Lotes' },
+    { Icon: Leaf,         label:'Culturas',          page:'Culturas' },
+    { Icon: Wheat,        label:'Produção',           page:'Producao' },
+    { Icon: Wrench,       label:'Atividades',         page:'Atividades' },
+    { Icon: CalendarDays, label:'Programação',        page:'Programacao' },
   ]},
   financeiro: { label:'Financeiro', items:[
-    { icon:'🛒', label:'Vendas', page:'Vendas' },
-    { icon:'💸', label:'Custos', page:'Custos' },
-    { icon:'🏦', label:'Financeiro', page:'Financeiro' },
+    { Icon: ShoppingCart, label:'Vendas',     page:'Vendas' },
+    { Icon: TrendingDown, label:'Custos',     page:'Custos' },
+    { Icon: Landmark,     label:'Financeiro', page:'Financeiro' },
   ]},
   mais: { label:'Mais', items:[
-    { icon:'👥', label:'Clientes', page:'Clientes' },
-    { icon:'🏭', label:'Fornecedores', page:'Fornecedores' },
-    { icon:'📊', label:'Relatórios',   page:'Relatorios' },
-    { icon:'📦', label:'Estoque', page:'Estoque' },
+    { Icon: Users,     label:'Clientes',     page:'Clientes' },
+    { Icon: Factory,   label:'Fornecedores', page:'Fornecedores' },
+    { Icon: BarChart2, label:'Relatórios',   page:'Relatorios' },
+    { Icon: Package,   label:'Estoque',      page:'Estoque' },
   ]}
 }
-
-const MOBILE_TABS = [
-  { id:'hoje',       icon:'📅', label:'Hoje',       page:'Dashboard' },
-  { id:'campo',      icon:'🌾', label:'Campo',      sheet:'campo',      pages:['Lotes','Culturas','Producao','Atividades','Programacao'] },
-  { id:'financeiro', icon:'💰', label:'Financeiro', sheet:'financeiro', pages:['Vendas','Custos','Financeiro'] },
-  { id:'estoque',    icon:'📦', label:'Estoque',    page:'Estoque' },
-  { id:'mais',       icon:'⚙️', label:'Mais',       sheet:'mais',       pages:['Clientes','Fornecedores','Estoque','Relatorios'] },
-]
-
-const DESKTOP_NAV = [
-  { icon:'📅', label:'Dashboard',        page:'Dashboard' },
-  { icon:'🗺️', label:'Lotes / Piquetes', page:'Lotes' },
-  { icon:'🌱', label:'Culturas',          page:'Culturas' },
-  { icon:'🌾', label:'Produção',           page:'Producao' },
-  { icon:'🔧', label:'Atividades',         page:'Atividades' },
-  { icon:'📆', label:'Programação',        page:'Programacao' },
-  { icon:'📦', label:'Estoque',            page:'Estoque' },
-  { icon:'🛒', label:'Vendas',             page:'Vendas' },
-  { icon:'💸', label:'Custos',             page:'Custos' },
-  { icon:'🏦', label:'Financeiro',         page:'Financeiro' },
-  { icon:'👥', label:'Clientes',           page:'Clientes' },
-  { icon:'🏭', label:'Fornecedores',       page:'Fornecedores' },
-  { icon:'📊', label:'Relatórios',           page:'Relatorios' },
-]
 
 function isTabActive(tab, p) { return tab.page ? p===tab.page : tab.pages?.includes(p) }
 function PageLoader() { return <div style={{textAlign:'center',padding:40,color:'#888'}}>Carregando...</div> }
@@ -108,6 +136,33 @@ function PageContent({ currentPage, setPage, sair, addRef }) {
   )
 }
 
+/* ─── LOGO ─────────────────────────────────────────────────── */
+function Logo({ size = 'md' }) {
+  const isLg = size === 'lg'
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap: isLg ? 10 : 8 }}>
+      <div style={{
+        width: isLg ? 36 : 28, height: isLg ? 36 : 28,
+        background: 'linear-gradient(135deg, var(--green-mid) 0%, var(--green-dark) 100%)',
+        borderRadius: isLg ? 10 : 8,
+        display:'flex', alignItems:'center', justifyContent:'center',
+        flexShrink: 0,
+        boxShadow: '0 2px 6px rgba(59,109,17,.35)',
+      }}>
+        <Leaf size={isLg ? 20 : 15} color="white" strokeWidth={2.2}/>
+      </div>
+      <span style={{
+        fontFamily:'var(--font-display)', fontWeight:600,
+        fontSize: isLg ? 22 : 16,
+        color:'var(--green-dark)', letterSpacing:'-.3px',
+      }}>
+        AgroGestão
+      </span>
+    </div>
+  )
+}
+
+/* ─── MOBILE LAYOUT ─────────────────────────────────────────── */
 function MobileLayout({ currentPage, setPage, sair }) {
   const [openSheet, setOpenSheet] = useState(null)
   const addRef = useRef(null)
@@ -121,14 +176,20 @@ function MobileLayout({ currentPage, setPage, sair }) {
 
   return (
     <div style={{minHeight:'100vh',background:'var(--bg)'}}>
-      <div style={{position:'fixed',top:0,left:0,right:0,zIndex:200,background:'white',borderBottom:'0.5px solid rgba(0,0,0,0.1)',height:52,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 16px'}}>
-        <span style={{fontSize:16,fontWeight:500,color:'#2d6a2d'}}>🍌 AgroGestão</span>
-        <span style={{fontSize:14,color:'#555',position:'absolute',left:'50%',transform:'translateX(-50%)',whiteSpace:'nowrap'}}>
+      {/* topbar */}
+      <div style={{
+        position:'fixed',top:0,left:0,right:0,zIndex:200,
+        background:'white',borderBottom:'1px solid var(--border)',
+        height:52,display:'flex',alignItems:'center',
+        justifyContent:'space-between',padding:'0 16px',
+      }}>
+        <Logo/>
+        <span style={{fontSize:14,fontWeight:600,color:'var(--text)',position:'absolute',left:'50%',transform:'translateX(-50%)',whiteSpace:'nowrap'}}>
           {PAGE_LABELS[currentPage]??currentPage}
         </span>
         <div>
           {ADD_LABELS[currentPage]&&(
-            <button onClick={()=>addRef.current?.()} style={{fontSize:11,background:'var(--green)',color:'white',border:'none',borderRadius:8,padding:'5px 10px',cursor:'pointer',fontWeight:600}}>
+            <button onClick={()=>addRef.current?.()} className="btn btn-primary btn-sm">
               {ADD_LABELS[currentPage]}
             </button>
           )}
@@ -144,27 +205,56 @@ function MobileLayout({ currentPage, setPage, sair }) {
       {openSheet&&<div onClick={()=>setOpenSheet(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:300}}/>}
 
       {sheet&&(
-        <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:400,background:'white',borderRadius:'20px 20px 0 0',padding:'20px 16px',paddingBottom:'calc(20px + env(safe-area-inset-bottom, 0px))'}}>
-          <div style={{width:40,height:4,background:'rgba(0,0,0,0.15)',borderRadius:2,margin:'0 auto 16px'}}/>
-          <div style={{fontSize:13,fontWeight:600,color:'#888',marginBottom:14,textAlign:'center',textTransform:'uppercase',letterSpacing:'.5px'}}>{sheet.label}</div>
+        <div style={{
+          position:'fixed',bottom:0,left:0,right:0,zIndex:400,
+          background:'white',borderRadius:'20px 20px 0 0',
+          padding:'20px 16px',
+          paddingBottom:'calc(20px + env(safe-area-inset-bottom, 0px))',
+        }}>
+          <div style={{width:36,height:4,background:'var(--gray-100)',borderRadius:2,margin:'0 auto 16px'}}/>
+          <div style={{fontSize:11,fontWeight:700,color:'var(--text-muted)',marginBottom:14,textAlign:'center',textTransform:'uppercase',letterSpacing:'1px'}}>{sheet.label}</div>
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-            {sheet.items.map(item=>(
-              <button key={item.page} onClick={()=>selectSheet(item.page)} style={{background:currentPage===item.page?'#EAF3DE':'white',border:currentPage===item.page?'1px solid #C0DD97':'0.5px solid rgba(0,0,0,0.1)',borderRadius:12,padding:16,display:'flex',flexDirection:'column',alignItems:'center',gap:8,cursor:'pointer'}}>
-                <span style={{fontSize:32}}>{item.icon}</span>
-                <span style={{fontSize:13,color:currentPage===item.page?'#2d6a2d':'#333',textAlign:'center',fontWeight:currentPage===item.page?600:400}}>{item.label}</span>
-              </button>
-            ))}
+            {sheet.items.map(item=>{
+              const active = currentPage===item.page
+              return (
+                <button key={item.page} onClick={()=>selectSheet(item.page)} style={{
+                  background: active ? 'var(--green-light)' : 'white',
+                  border: active ? '1.5px solid var(--green-mid)' : '1px solid var(--border)',
+                  borderRadius:12,padding:16,
+                  display:'flex',flexDirection:'column',alignItems:'center',gap:8,
+                  cursor:'pointer',
+                }}>
+                  <item.Icon size={24} color={active ? 'var(--green)' : 'var(--text-muted)'} strokeWidth={1.8}/>
+                  <span style={{fontSize:13,color:active?'var(--green-dark)':'var(--text)',textAlign:'center',fontWeight:active?600:400}}>{item.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
 
-      <nav style={{position:'fixed',bottom:0,left:0,right:0,background:'white',borderTop:'0.5px solid rgba(0,0,0,0.1)',display:'flex',justifyContent:'space-around',alignItems:'flex-start',padding:'8px 0',paddingBottom:'calc(8px + env(safe-area-inset-bottom, 0px))',zIndex:500}}>
+      <nav style={{
+        position:'fixed',bottom:0,left:0,right:0,
+        background:'white',borderTop:'1px solid var(--border)',
+        display:'flex',justifyContent:'space-around',alignItems:'flex-start',
+        padding:'8px 0',paddingBottom:'calc(8px + env(safe-area-inset-bottom, 0px))',
+        zIndex:500,
+      }}>
         {MOBILE_TABS.map(tab=>{
-          const active=isTabActive(tab,currentPage); const so=openSheet===tab.sheet
+          const active = isTabActive(tab,currentPage)
+          const so = openSheet===tab.sheet
+          const highlighted = active || so
           return(
-            <button key={tab.id} onClick={()=>pressTab(tab)} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:3,minWidth:60,minHeight:44,justifyContent:'center',cursor:'pointer',WebkitTapHighlightColor:'transparent',border:'none',padding:'4px 8px',borderRadius:12,background:(active||so)?'#EAF3DE':'none'}}>
-              <span style={{fontSize:24,lineHeight:1}}>{tab.icon}</span>
-              <span style={{fontSize:11,fontWeight:(active||so)?600:400,color:(active||so)?'#2d6a2d':'#888'}}>{tab.label}</span>
+            <button key={tab.id} onClick={()=>pressTab(tab)} style={{
+              display:'flex',flexDirection:'column',alignItems:'center',gap:3,
+              minWidth:60,minHeight:44,justifyContent:'center',
+              cursor:'pointer',WebkitTapHighlightColor:'transparent',
+              border:'none',padding:'4px 8px',
+              borderRadius:10,
+              background: highlighted ? 'var(--green-light)' : 'none',
+            }}>
+              <tab.Icon size={22} color={highlighted?'var(--green)':'var(--text-muted)'} strokeWidth={highlighted?2.2:1.8}/>
+              <span style={{fontSize:10,fontWeight:highlighted?600:400,color:highlighted?'var(--green-dark)':'var(--text-muted)'}}>{tab.label}</span>
             </button>
           )
         })}
@@ -173,35 +263,113 @@ function MobileLayout({ currentPage, setPage, sair }) {
   )
 }
 
+/* ─── DESKTOP LAYOUT ────────────────────────────────────────── */
 function DesktopLayout({ currentPage, setPage, sair }) {
   const addRef = useRef(null)
+  const { tenants, tenantId } = useAuth()
+  const tenantName = tenants.find(t => t.tenant_id === tenantId)?.tenants?.nome ?? ''
 
   return (
-    <div style={{display:'flex',height:'100vh',overflow:'hidden',background:'#FAFAFA'}}>
-      <div style={{width:200,flexShrink:0,background:'white',borderRight:'0.5px solid rgba(0,0,0,0.1)',display:'flex',flexDirection:'column',height:'100vh',overflowY:'auto'}}>
-        <div style={{padding:'18px 16px 12px',borderBottom:'0.5px solid rgba(0,0,0,0.08)'}}>
-          <div style={{fontSize:16,fontWeight:600,color:'#2d6a2d',cursor:'pointer'}} onClick={()=>setPage('Dashboard')}>🍌 AgroGestão</div>
-          <div style={{fontSize:11,color:'#aaa',marginTop:2}}>Jaíba · MG</div>
+    <div style={{display:'flex',height:'100vh',overflow:'hidden',background:'var(--bg)'}}>
+      {/* Sidebar */}
+      <div style={{
+        width:220,flexShrink:0,
+        background:'white',
+        borderRight:'1px solid var(--border)',
+        display:'flex',flexDirection:'column',
+        height:'100vh',overflowY:'auto',
+      }}>
+        {/* Logo */}
+        <div style={{padding:'20px 18px 16px',borderBottom:'1px solid var(--border)'}}>
+          <Logo/>
+          {tenantName && (
+            <div style={{fontSize:11,color:'var(--text-muted)',marginTop:6,paddingLeft:2,
+              display:'flex',alignItems:'center',gap:4}}>
+              <div style={{width:6,height:6,borderRadius:'50%',background:'var(--green-mid)',flexShrink:0}}/>
+              {tenantName}
+            </div>
+          )}
         </div>
-        <nav style={{flex:1,padding:'8px 0'}}>
-          {DESKTOP_NAV.map(item=>(
-            <button key={item.page} onClick={()=>setPage(item.page)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'8px 16px',border:'none',cursor:'pointer',textAlign:'left',background:currentPage===item.page?'#EAF3DE':'none',color:currentPage===item.page?'#2d6a2d':'#666',fontWeight:currentPage===item.page?500:400,fontSize:13}}>
-              <span style={{fontSize:14}}>{item.icon}</span><span>{item.label}</span>
-            </button>
+
+        {/* Nav sections */}
+        <nav style={{flex:1,padding:'10px 10px',overflowY:'auto'}}>
+          {DESKTOP_NAV.map((group, gi) => (
+            <div key={gi} style={{marginBottom: group.section ? 4 : 0}}>
+              {group.section && (
+                <div style={{
+                  fontSize:10,fontWeight:700,color:'var(--text-muted)',
+                  textTransform:'uppercase',letterSpacing:'1px',
+                  padding:'10px 12px 4px',
+                }}>
+                  {group.section}
+                </div>
+              )}
+              {group.items.map(item => {
+                const active = currentPage === item.page
+                return (
+                  <button key={item.page} onClick={()=>setPage(item.page)} style={{
+                    width:'100%',display:'flex',alignItems:'center',gap:9,
+                    padding:'8px 12px',marginBottom:1,
+                    border:'none',cursor:'pointer',textAlign:'left',
+                    borderRadius:8,
+                    background: active ? 'var(--green-light)' : 'none',
+                    color: active ? 'var(--green-dark)' : 'var(--text-muted)',
+                    fontWeight: active ? 600 : 400,
+                    fontSize:13.5,
+                    fontFamily:'var(--font)',
+                    borderLeft: active ? '3px solid var(--green)' : '3px solid transparent',
+                    transition:'all 0.1s',
+                  }}
+                  onMouseEnter={e=>{if(!active){e.currentTarget.style.background='var(--green-light)';e.currentTarget.style.color='var(--green-dark)'}}}
+                  onMouseLeave={e=>{if(!active){e.currentTarget.style.background='none';e.currentTarget.style.color='var(--text-muted)'}}}>
+                    <item.Icon size={15} strokeWidth={active?2.2:1.8}/>
+                    <span>{item.label}</span>
+                  </button>
+                )
+              })}
+            </div>
           ))}
         </nav>
-        <div style={{borderTop:'0.5px solid rgba(0,0,0,0.08)',padding:'10px 0'}}>
-          <button onClick={sair} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'8px 16px',border:'none',cursor:'pointer',background:'none',color:'#888',fontSize:13}}>
-            <span>🚪</span><span>Sair</span>
+
+        {/* Footer */}
+        <div style={{borderTop:'1px solid var(--border)',padding:'10px 10px'}}>
+          <button onClick={sair} style={{
+            width:'100%',display:'flex',alignItems:'center',gap:9,
+            padding:'8px 12px',border:'none',cursor:'pointer',
+            background:'none',color:'var(--text-muted)',fontSize:13.5,
+            fontFamily:'var(--font)',borderRadius:8,
+            transition:'all 0.1s',
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.background='var(--red-light)';e.currentTarget.style.color='var(--red)'}}
+          onMouseLeave={e=>{e.currentTarget.style.background='none';e.currentTarget.style.color='var(--text-muted)'}}>
+            <LogOut size={15} strokeWidth={1.8}/>
+            <span>Sair</span>
           </button>
         </div>
       </div>
+
+      {/* Main area */}
       <div style={{flex:1,display:'flex',flexDirection:'column',overflow:'hidden'}}>
-        <div style={{height:48,background:'white',borderBottom:'0.5px solid rgba(0,0,0,0.1)',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 20px',flexShrink:0}}>
-          <span style={{fontSize:16,fontWeight:600,color:'#333'}}>{PAGE_LABELS[currentPage]??'Dashboard'}</span>
-          {ADD_LABELS[currentPage]&&<button className="btn btn-primary" onClick={()=>addRef.current?.()}>{ADD_LABELS[currentPage]}</button>}
+        {/* Topbar */}
+        <div style={{
+          height:52,background:'white',
+          borderBottom:'1px solid var(--border)',
+          display:'flex',alignItems:'center',
+          justifyContent:'space-between',
+          padding:'0 24px',flexShrink:0,
+        }}>
+          <span style={{fontSize:15,fontWeight:600,color:'var(--text)',letterSpacing:'-.2px'}}>
+            {PAGE_LABELS[currentPage]??'Dashboard'}
+          </span>
+          {ADD_LABELS[currentPage]&&(
+            <button className="btn btn-primary" onClick={()=>addRef.current?.()}>
+              {ADD_LABELS[currentPage]}
+            </button>
+          )}
         </div>
-        <div style={{flex:1,overflowY:'auto',padding:'16px 20px'}}>
+
+        {/* Content */}
+        <div style={{flex:1,overflowY:'auto',padding:'20px 24px'}}>
           <PageContent currentPage={currentPage} setPage={setPage} sair={sair} addRef={addRef}/>
         </div>
       </div>
@@ -209,15 +377,33 @@ function DesktopLayout({ currentPage, setPage, sair }) {
   )
 }
 
-export default function App() {
-  const [logado, setLogado]           = useState(localStorage.getItem('frutminas_auth')==='true')
+/* ─── APP ROOT ──────────────────────────────────────────────── */
+function AppInner() {
+  const { user, tenantId, loading, signOut } = useAuth()
   const [currentPage, setCurrentPage] = useState('Dashboard')
   const isMobile = useIsMobile(768)
 
-  if (!logado) return <Login onLogin={()=>setLogado(true)}/>
-  function sair() { localStorage.removeItem('frutminas_auth'); setLogado(false) }
+  if (loading) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
+        <Logo size="lg"/>
+        <div style={{ color:'var(--text-muted)', fontSize:13 }}>Carregando...</div>
+      </div>
+    </div>
+  )
+
+  if (!user) return <Login />
+  if (!tenantId) return <TenantSelector />
 
   return isMobile
-    ? <MobileLayout  currentPage={currentPage} setPage={setCurrentPage} sair={sair}/>
-    : <DesktopLayout currentPage={currentPage} setPage={setCurrentPage} sair={sair}/>
+    ? <MobileLayout  currentPage={currentPage} setPage={setCurrentPage} sair={signOut}/>
+    : <DesktopLayout currentPage={currentPage} setPage={setCurrentPage} sair={signOut}/>
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  )
 }

@@ -108,7 +108,7 @@ async function syncAll(onProgress) {
 }
 
 // ─── HOOK PRINCIPAL ──────────────────────────────────────────
-export function useOfflineSync() {
+export function useOfflineSync(tenantId) {
   const [isOnline, setIsOnline]       = useState(navigator.onLine)
   const [pendingCount, setPending]    = useState(0)
   const [syncing, setSyncing]         = useState(false)
@@ -176,23 +176,28 @@ export function useOfflineSync() {
 
   // Wrapper inteligente: tenta online, cai para offline
   const save = useCallback(async (table, action, data) => {
+    // Injeta tenant_id em inserts/updates
+    const payload = (action !== 'delete' && tenantId)
+      ? { tenant_id: tenantId, ...data }
+      : data
+
     if (!navigator.onLine) {
-      await saveOffline(table, action, data)
-      return { offline: true, data }
+      await saveOffline(table, action, payload)
+      return { offline: true, data: payload }
     }
     try {
       let result
-      if (action === 'insert') result = await supabase.from(table).insert(data).select().single()
-      else if (action === 'update') result = await supabase.from(table).update(data).eq('id', data.id).select().single()
+      if (action === 'insert') result = await supabase.from(table).insert(payload).select().single()
+      else if (action === 'update') result = await supabase.from(table).update(payload).eq('id', payload.id).select().single()
       else if (action === 'delete') result = await supabase.from(table).delete().eq('id', data.id)
       if (result?.error) throw result.error
       return { offline: false, data: result?.data }
     } catch {
       // Falhou online — salva offline
-      await saveOffline(table, action, data)
-      return { offline: true, data }
+      await saveOffline(table, action, payload)
+      return { offline: true, data: payload }
     }
-  }, [saveOffline])
+  }, [saveOffline, tenantId])
 
   return { isOnline, pendingCount, syncing, lastSync, syncStatus, save, triggerSync }
 }

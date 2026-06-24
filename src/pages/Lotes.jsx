@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, statusLoteBadge } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 // ─── CONSTANTES ──────────────────────────────────────────────
 const ESTAGIOS = ['jovem','producao','final']
@@ -34,6 +35,7 @@ const TIPO_BG = {
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────
 export default function Lotes({ onAddBtn }) {
+  const { tenantId } = useAuth()
   // dados gerais
   const [lotes, setLotes]       = useState([])
   const [resumo, setResumo]     = useState({})
@@ -207,6 +209,7 @@ export default function Lotes({ onAddBtn }) {
         p_status: fStatus,
         p_observacoes: fObs || null,
         p_setores: setoresPayload,
+        p_tenant_id: tenantId,
       })
       if (error) throw new Error(error.message)
       setEditAberto(false)
@@ -489,7 +492,7 @@ export default function Lotes({ onAddBtn }) {
                                 setFSetores(prev => prev.map((ss, ii) =>
                                   ii !== idx ? ss : {...ss, variedades: [nova], novaVariedade: ''}
                                 ))
-                                supabase.from('variedades_cadastradas').insert({nome: nova}).then(() =>
+                                supabase.from('variedades_cadastradas').insert({nome: nova, tenant_id: tenantId}).then(() =>
                                   setVarSugestoes(prev => [...new Set([...prev, nova])].sort())
                                 )
                               }
@@ -505,7 +508,7 @@ export default function Lotes({ onAddBtn }) {
                               setFSetores(prev => prev.map((ss, ii) =>
                                 ii !== idx ? ss : {...ss, variedades: [nova], novaVariedade: ''}
                               ))
-                              supabase.from('variedades_cadastradas').insert({nome: nova}).then(() =>
+                              supabase.from('variedades_cadastradas').insert({nome: nova, tenant_id: tenantId}).then(() =>
                                 setVarSugestoes(prev => [...new Set([...prev, nova])].sort())
                               )
                             }

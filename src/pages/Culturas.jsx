@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 // ─── ENUMS ───────────────────────────────────────────────────
 const TIPOS = [
@@ -26,6 +27,7 @@ const EMPTY = {
 }
 
 export default function Culturas({ onAddBtn }) {
+  const { tenantId } = useAuth()
   const [culturas, setCulturas]   = useState([])
   const [lucros, setLucros]       = useState({})
   const [varCad, setVarCad]         = useState([])
@@ -103,7 +105,7 @@ export default function Culturas({ onAddBtn }) {
       ativo: form.ativo, settings: form.settings
     }
     if (editId) await supabase.from('culturas').update(payload).eq('id', editId)
-    else await supabase.from('culturas').insert(payload)
+    else await supabase.from('culturas').insert({ ...payload, tenant_id: tenantId })
     setSaving(false); setModal(false); load()
   }
 
@@ -436,7 +438,7 @@ export default function Culturas({ onAddBtn }) {
                     if (e.key !== 'Enter') return
                     const nome = e.target.value.trim().toUpperCase()
                     if (!nome) return
-                    const { data } = await supabase.from('variedades_cadastradas').insert({ nome, cultura: modalVars.nome }).select().single()
+                    const { data } = await supabase.from('variedades_cadastradas').insert({ nome, cultura: modalVars.nome, tenant_id: tenantId }).select().single()
                     if (data) { setVarCad(prev => [...prev, data]); e.target.value = '' }
                   }}
                 />
@@ -445,7 +447,7 @@ export default function Culturas({ onAddBtn }) {
                     const input = document.getElementById('inputVarModal')
                     const nome = input?.value?.trim().toUpperCase()
                     if (!nome) return
-                    const { data } = await supabase.from('variedades_cadastradas').insert({ nome, cultura: modalVars.nome }).select().single()
+                    const { data } = await supabase.from('variedades_cadastradas').insert({ nome, cultura: modalVars.nome, tenant_id: tenantId }).select().single()
                     if (data) { setVarCad(prev => [...prev, data]); input.value = '' }
                   }}>+ Add</button>
               </div>

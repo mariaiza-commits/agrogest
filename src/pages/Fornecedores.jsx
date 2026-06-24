@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 const CATS = ['geral','insumos','servicos','equipamentos','transporte','outros']
 const EMPTY = { nome:'', cpf_cnpj:'', telefone:'', email:'', categoria:'geral', observacoes:'' }
 
 export default function Fornecedores({ onAddBtn }) {
+  const { tenantId } = useAuth()
   const [fornecedores, setFornecedores] = useState([])
   const [historico, setHistorico]       = useState({})
   const [loading, setLoading]           = useState(true)
@@ -42,7 +44,7 @@ export default function Fornecedores({ onAddBtn }) {
     setSaving(true)
     const payload = { nome:form.nome.trim(), cpf_cnpj:form.cpf_cnpj||null, telefone:form.telefone||null, email:form.email||null, categoria:form.categoria, observacoes:form.observacoes||null }
     if (editId) await supabase.from('suppliers').update(payload).eq('id', editId)
-    else await supabase.from('suppliers').insert(payload)
+    else await supabase.from('suppliers').insert({ ...payload, tenant_id: tenantId })
     setSaving(false); setModal(false); load()
   }
 
