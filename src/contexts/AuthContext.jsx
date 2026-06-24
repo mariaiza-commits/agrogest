@@ -43,6 +43,8 @@ export function AuthProvider({ children }) {
         restoreTenant(list)
       }
       setLoading(false)
+    }).catch(() => {
+      setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
