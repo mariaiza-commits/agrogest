@@ -152,26 +152,6 @@ export default function Dashboard() {
         <KpiCard icon="%" label="Margem" value={margem > 0 ? `${margem}%` : '—'} sub="lucro ÷ receita" color={Number(margem) >= 30 ? 'var(--green)' : Number(margem) > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
       </div>
 
-      {/* GRÁFICOS — receita por lote e por cultura */}
-      {lotes.some(l => Number(l.receita_bruta) > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-          <GraficoBarras
-            title="Receita por lote"
-            labels={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>l.lote)}
-            data={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>Number(l.receita_bruta))}
-            color="rgba(29,158,117,.85)"
-          />
-          {cultComReceita.length > 1 && (
-            <GraficoBarras
-              title="Receita por cultura"
-              labels={cultComReceita.map(c=>c.cultura)}
-              data={cultComReceita.map(c=>Number(c.receita_total))}
-              color="rgba(59,109,17,.75)"
-            />
-          )}
-        </div>
-      )}
-
       {/* ALERTAS */}
       {alertas.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -222,6 +202,26 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* GRÁFICOS */}
+      {lotes.some(l => Number(l.receita_bruta) > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          <GraficoBarras
+            title="Receita por lote"
+            labels={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>l.lote)}
+            data={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>Number(l.receita_bruta))}
+            color="rgba(29,158,117,.85)"
+          />
+          {cultComReceita.length > 1 && (
+            <GraficoBarras
+              title="Receita por cultura"
+              labels={cultComReceita.map(c=>c.cultura)}
+              data={cultComReceita.map(c=>Number(c.receita_total))}
+              color="rgba(59,109,17,.75)"
+            />
           )}
         </div>
       )}
