@@ -41,7 +41,7 @@ export default function Login() {
     setLoading(true)
     try {
       const timeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 12000)
+        setTimeout(() => reject(new Error('timeout')), 30000)
       )
       await Promise.race([signIn(email, senha), timeout])
     } catch (err) {

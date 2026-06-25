@@ -140,15 +140,6 @@ export function useOfflineSync(tenantId) {
     }
   }, [refreshCount])
 
-  // Registra Service Worker
-  useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js').catch(err => {
-        console.warn('Service Worker não registrado:', err)
-      })
-    }
-  }, [])
-
   const triggerSync = useCallback(async () => {
     if (syncing || !navigator.onLine) return
     const count = await countPending()
