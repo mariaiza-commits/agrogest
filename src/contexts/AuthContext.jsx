@@ -4,16 +4,33 @@ import { supabase } from '../lib/supabase'
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://juqvvdnybhwelctlhdlr.supabase.co'
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1cXZ2ZG55Ymh3ZWxjdGxoZGxyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMzYxMTcsImV4cCI6MjA5MjkxMjExN30.3sddN3zuQvwnUHzO4yUpQVnIA07qY6H23PfeHTau0fg'
 
-// Todas as chamadas ao Supabase via fetch puro — zero SDK, zero travamento
+// Login com retry automático — resolve problema de conexão TCP velha
+// Tenta até 3 vezes com timeout de 12s cada. Cada retry abre nova conexão.
 async function signInDirectFetch(email, password) {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
-    body: JSON.stringify({ email, password }),
-  })
-  const json = await res.json()
-  if (!res.ok) throw new Error(json.error_description || json.msg || 'Erro ao fazer login')
-  return json
+  const url = `${SUPABASE_URL}/auth/v1/token?grant_type=password`
+  const body = JSON.stringify({ email, password })
+  const headers = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY }
+
+  let lastError
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const controller = new AbortController()
+    const t = setTimeout(() => controller.abort(), 12000)
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body, signal: controller.signal })
+      clearTimeout(t)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error_description || json.msg || 'Credenciais inválidas')
+      return json
+    } catch (e) {
+      clearTimeout(t)
+      lastError = e
+      if (e.name !== 'AbortError' && attempt < 3) continue // erro real, não timeout — retry
+      if (e.name === 'AbortError' && attempt < 3) continue // timeout — retry com nova conexão
+    }
+  }
+  throw lastError?.name === 'AbortError'
+    ? new Error('Servidor demorou muito. Verifique sua conexão.')
+    : lastError
 }
 
 async function fetchTenantsRaw(userId, accessToken) {
