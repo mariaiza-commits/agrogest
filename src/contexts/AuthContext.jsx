@@ -1,6 +1,22 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://juqvvdnybhwelctlhdlr.supabase.co'
+const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1cXZ2ZG55Ymh3ZWxjdGxoZGxyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMzYxMTcsImV4cCI6MjA5MjkxMjExN30.3sddN3zuQvwnUHzO4yUpQVnIA07qY6H23PfeHTau0fg'
+
+// Login direto via fetch — bypassa completamente o SDK do Supabase
+// Evita qualquer problema de estado interno do cliente
+async function signInDirectFetch(email, password) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY },
+    body: JSON.stringify({ email, password }),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error_description || json.msg || 'Erro ao fazer login')
+  return json // { access_token, refresh_token, expires_at, user, ... }
+}
+
 const AuthContext = createContext(null)
 
 // Verifica se o token salvo ainda é válido SEM fazer chamada de rede
@@ -97,16 +113,21 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function signIn(email, password) {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
-    if (data?.user) {
-      const list = await fetchTenants(data.user.id)
-      const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
-      setUser(data.user)
-      setTenants(list)
-      if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
-    }
-    return data
+    // Usa fetch direto — bypass total do SDK, sem estado interno, sem mutex
+    const session = await signInDirectFetch(email, password)
+    const user = session.user
+    if (!user) throw new Error('Usuário não encontrado')
+
+    // Salva sessão no formato que o SDK do Supabase espera
+    const storageKey = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`
+    localStorage.setItem(storageKey, JSON.stringify(session))
+
+    const list = await fetchTenants(user.id)
+    const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+    setUser(user)
+    setTenants(list)
+    if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
+    return session
   }
 
   async function signOut() {
