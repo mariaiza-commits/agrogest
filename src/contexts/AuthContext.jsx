@@ -3,6 +3,23 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+// Apaga o token do Supabase do localStorage se estiver expirado
+// Isso evita que getSession() tente renovar e trave tudo
+function clearExpiredToken() {
+  try {
+    const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    if (!key) return
+    const raw = localStorage.getItem(key)
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    const expiresAt = parsed?.expires_at ?? 0
+    if (Date.now() / 1000 > expiresAt) {
+      localStorage.removeItem(key)
+      localStorage.removeItem('ag_tenant_id')
+    }
+  } catch {}
+}
+
 async function fetchTenants(userId) {
   try {
     const { data } = await supabase
@@ -22,52 +39,38 @@ function pickTenant(list, saved) {
 }
 
 export function AuthProvider({ children }) {
-  // Lê localStorage de forma síncrona — sem esperar nada
+  // Apaga token expirado ANTES de qualquer coisa — síncrono, instantâneo
+  clearExpiredToken()
+
   const savedTenant = localStorage.getItem('ag_tenant_id')
 
   const [user,     setUser]     = useState(null)
   const [tenants,  setTenants]  = useState([])
   const [tenantId, setTenantId] = useState(savedTenant)
-
-  // Se há tenant salvo, começa sem loading (app abre na hora)
-  // Se não há, mostra loading só até o Supabase responder
-  const [loading, setLoading] = useState(!savedTenant)
+  const [loading,  setLoading]  = useState(!savedTenant)
 
   useEffect(() => {
     let cancelled = false
 
-    // Verifica sessão em background — não bloqueia a UI se savedTenant existe
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return
 
       if (session?.user) {
         const list = await fetchTenants(session.user.id)
         if (cancelled) return
-
         const tid = pickTenant(list, savedTenant)
         setUser(session.user)
         setTenants(list)
-        if (tid) {
-          setTenantId(tid)
-          localStorage.setItem('ag_tenant_id', tid)
-        }
+        if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
       } else {
-        // Sem sessão válida — limpa localmente sem chamada de rede
-        await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-        setUser(null)
-        setTenants([])
-        setTenantId(null)
+        setUser(null); setTenants([]); setTenantId(null)
         localStorage.removeItem('ag_tenant_id')
       }
       setLoading(false)
-    }).catch(async () => {
-      if (!cancelled) {
-        await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-        setLoading(false)
-      }
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
     })
 
-    // Timeout de segurança absoluto: 5s e libera de qualquer jeito
     const t = setTimeout(() => { if (!cancelled) setLoading(false) }, 5000)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -93,11 +96,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function signIn(email, password) {
-    // Limpa sessão local sem fazer chamada de rede (evita travar no signOut)
-    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
-    // Garante que tenants são carregados mesmo se onAuthStateChange não disparar
     if (data?.user) {
       const list = await fetchTenants(data.user.id)
       const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
