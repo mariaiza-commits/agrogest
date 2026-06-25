@@ -1,86 +1,104 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user, setUser]             = useState(null)
-  const [tenants, setTenants]       = useState([])
-  const [tenantId, setTenantId]     = useState(null)
-  const [loading, setLoading]       = useState(true)
+  const [user, setUser]         = useState(null)
+  const [tenants, setTenants]   = useState([])
+  const [tenantId, setTenantId] = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const initialized = useRef(false)
 
-  // Carrega fazendas do usuário após login
   async function loadTenants(userId) {
-    const { data } = await supabase
-      .from('user_tenants')
-      .select('tenant_id, role, tenants(id, nome, slug)')
-      .eq('user_id', userId)
-    return data ?? []
+    try {
+      const { data } = await supabase
+        .from('user_tenants')
+        .select('tenant_id, role, tenants(id, nome, slug)')
+        .eq('user_id', userId)
+      return data ?? []
+    } catch {
+      return []
+    }
   }
 
-  // Restaura tenant salvo no localStorage (para não pedir seleção a cada refresh)
-  function restoreTenant(tenantList) {
+  function applyTenant(tenantList) {
+    if (!tenantList.length) return
     const saved = localStorage.getItem('ag_tenant_id')
     const found = tenantList.find(t => t.tenant_id === saved)
     if (found) {
       setTenantId(found.tenant_id)
-      return true
-    }
-    if (tenantList.length === 1) {
+    } else {
       setTenantId(tenantList[0].tenant_id)
       localStorage.setItem('ag_tenant_id', tenantList[0].tenant_id)
-      return true
     }
-    return false
   }
 
   useEffect(() => {
-    // Timeout de segurança: se Supabase não responder em 8s, libera o app
-    const timeout = setTimeout(() => setLoading(false), 8000)
+    let cancelled = false
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      clearTimeout(timeout)
-      if (session?.user) {
-        setUser(session.user)
-        const list = await loadTenants(session.user.id)
-        setTenants(list)
-        restoreTenant(list)
+    async function init() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (cancelled) return
+
+        if (session?.user) {
+          const list = await loadTenants(session.user.id)
+          if (cancelled) return
+          setUser(session.user)
+          setTenants(list)
+          applyTenant(list)
+        }
+      } catch {
+        // falha silenciosa — usuário não autenticado
+      } finally {
+        if (!cancelled) setLoading(false)
       }
-      setLoading(false)
-    }).catch(() => {
-      clearTimeout(timeout)
-      setLoading(false)
-    })
+    }
+
+    // Timeout de segurança: nunca fica preso mais de 6 segundos
+    const timeout = setTimeout(() => {
+      if (!cancelled) setLoading(false)
+    }, 6000)
+
+    init().then(() => clearTimeout(timeout))
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user)
-        const list = await loadTenants(session.user.id)
-        setTenants(list)
-        restoreTenant(list)
-      } else {
+      if (cancelled) return
+
+      if (event === 'SIGNED_IN' && session?.user) {
+        // Só recarrega tenants se ainda não inicializou com esse usuário
+        if (!initialized.current || user?.id !== session.user.id) {
+          initialized.current = true
+          const list = await loadTenants(session.user.id)
+          if (!cancelled) {
+            setUser(session.user)
+            setTenants(list)
+            applyTenant(list)
+            setLoading(false)
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        initialized.current = false
         setUser(null)
         setTenants([])
         setTenantId(null)
         localStorage.removeItem('ag_tenant_id')
+        setLoading(false)
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        setUser(session.user)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      cancelled = true
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
-    return data
-  }
-
-  async function signUp(email, password, farmName) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { farm_name: farmName } },
-    })
     if (error) throw error
     return data
   }
@@ -95,8 +113,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('ag_tenant_id', id)
   }
 
-  const value = { user, tenants, tenantId, loading, signIn, signUp, signOut, selectTenant }
-
+  const value = { user, tenants, tenantId, loading, signIn, signOut, selectTenant }
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
