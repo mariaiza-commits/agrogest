@@ -27,7 +27,7 @@ function KpiCard({ icon, label, value, sub, color = 'var(--text)', bg, badge }) 
         {badge && <span style={{ fontSize: 10, background: badge.bg, color: badge.color, borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>{badge.text}</span>}
         <span style={{ fontSize: 18 }}>{icon}</span>
       </div>
-      <div style={{ fontSize: 20, fontWeight: 800, color, fontFamily: 'var(--font-display)', lineHeight: 1.1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{value}</div>
+      <div style={{ fontSize: 'clamp(14px, 2vw, 20px)', fontWeight: 800, color, fontFamily: 'var(--font-display)', lineHeight: 1.15, wordBreak: 'break-word' }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
@@ -152,6 +152,26 @@ export default function Dashboard() {
         <KpiCard icon="%" label="Margem" value={margem > 0 ? `${margem}%` : '—'} sub="lucro ÷ receita" color={Number(margem) >= 30 ? 'var(--green)' : Number(margem) > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
       </div>
 
+      {/* GRÁFICOS — receita por lote e por cultura */}
+      {lotes.some(l => Number(l.receita_bruta) > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+          <GraficoBarras
+            title="Receita por lote"
+            labels={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>l.lote)}
+            data={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>Number(l.receita_bruta))}
+            color="rgba(29,158,117,.85)"
+          />
+          {cultComReceita.length > 1 && (
+            <GraficoBarras
+              title="Receita por cultura"
+              labels={cultComReceita.map(c=>c.cultura)}
+              data={cultComReceita.map(c=>Number(c.receita_total))}
+              color="rgba(59,109,17,.75)"
+            />
+          )}
+        </div>
+      )}
+
       {/* ALERTAS */}
       {alertas.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -202,26 +222,6 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* GRÁFICOS */}
-      {lotes.some(l => Number(l.receita_bruta) > 0) && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-          <GraficoBarras
-            title="Receita por lote"
-            labels={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>l.lote)}
-            data={lotes.filter(l=>Number(l.receita_bruta)>0).map(l=>Number(l.receita_bruta))}
-            color="rgba(29,158,117,.8)"
-          />
-          {cultComReceita.length > 1 && (
-            <GraficoBarras
-              title="Receita por cultura"
-              labels={cultComReceita.map(c=>c.cultura)}
-              data={cultComReceita.map(c=>Number(c.receita_total))}
-              color="rgba(59,130,246,.7)"
-            />
           )}
         </div>
       )}
@@ -367,7 +367,7 @@ function GraficoBarras({ title, labels, data, color }) {
         {labels.map((label, i) => (
           <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ minWidth: 60, fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
-            <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 4, height: 20, overflow: 'hidden', position: 'relative' }}>
+            <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 6, height: 28, overflow: 'hidden', position: 'relative' }}>
               <div style={{
                 width: Math.min(data[i] / max * 100, 100) + '%',
                 height: '100%',
@@ -376,7 +376,7 @@ function GraficoBarras({ title, labels, data, color }) {
                 transition: 'width .4s',
                 display: 'flex', alignItems: 'center', paddingLeft: 6,
               }}>
-                <span style={{ fontSize: 10, color: 'white', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmt(data[i])}</span>
+                <span style={{ fontSize: 11, color: 'white', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmt(data[i])}</span>
               </div>
             </div>
           </div>
