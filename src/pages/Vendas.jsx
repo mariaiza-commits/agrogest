@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
-import { fmt, fmtDate } from '../lib/utils'
+import { fmt, fmtDate, BtnExportar } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Vendas({ onAddBtn }) {
@@ -213,6 +213,23 @@ export default function Vendas({ onAddBtn }) {
       {vendas.length === 0
         ? <div className="empty">Nenhuma venda registrada.</div>
         : <div className="card">
+            <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}>
+              <BtnExportar
+                dados={vendas.map(v => ({
+                  'Data': fmtDate(v.data_venda),
+                  'Cliente': v.comprador || '—',
+                  'Condição': v.condicao || '—',
+                  'Qtd 1ª': v.quantidade_primeira ?? 0,
+                  'Qtd 2ª': v.quantidade_segunda ?? 0,
+                  'Valor Bruto': Number(v.valor_total ?? 0),
+                  'Valor Líquido': Number(v.valor_liquido ?? 0),
+                  'Vencimento': fmtDate(v.data_vencimento),
+                  'Status': v.status_pagamento,
+                }))}
+                nome="Vendas"
+                titulo="Relatório de Vendas"
+              />
+            </div>
             <div className="table-wrap">
               <table>
                 <thead><tr>

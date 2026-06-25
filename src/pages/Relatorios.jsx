@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
-import * as XLSX from 'xlsx'
+import { BtnExportar, exportarPDF } from '../lib/utils'
 
 const RELATORIOS = [
   { id:'clientes',    icon:'👥', label:'Por Cliente',     desc:'Compras, valores e pendências por cliente' },
@@ -185,21 +185,6 @@ export default function Relatorios() {
     setLoading(false)
   }
 
-  function exportarExcel() {
-    if (!dados.length) return alert('Nenhum dado para exportar.')
-    const rel = RELATORIOS.find(r => r.id === relAtivo)
-    const ws = XLSX.utils.json_to_sheet(dados)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, rel?.label ?? 'Relatório')
-
-    // Auto width
-    const cols = Object.keys(dados[0]).map(k => ({ wch: Math.max(k.length, 12) }))
-    ws['!cols'] = cols
-
-    const nome = `${rel?.label ?? 'Relatorio'}_${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.xlsx`
-    XLSX.writeFile(wb, nome)
-  }
-
   const totalValor = dados.reduce((s, r) => {
     const v = r['Valor Líquido'] ?? r['Valor Bruto'] ?? r['Valor'] ?? r['Receita Bruta'] ?? r['Lucro Bruto'] ?? 0
     return s + Number(v)
@@ -333,9 +318,11 @@ export default function Relatorios() {
               🔍 Gerar
             </button>
             {dados.length > 0 && (
-              <button className="btn" style={{ background:'#EAF3DE', color:'#2d6a2d', border:'1px solid #C0DD97' }} onClick={exportarExcel}>
-                📥 Exportar Excel
-              </button>
+              <BtnExportar
+                dados={dados}
+                nome={RELATORIOS.find(r => r.id === relAtivo)?.label ?? 'Relatorio'}
+                titulo={RELATORIOS.find(r => r.id === relAtivo)?.label ?? 'Relatório'}
+              />
             )}
           </div>
         </div>
