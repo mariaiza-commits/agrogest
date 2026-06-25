@@ -52,15 +52,20 @@ export function AuthProvider({ children }) {
           localStorage.setItem('ag_tenant_id', tid)
         }
       } else {
-        // Sem sessão válida — limpa tudo e manda para login
+        // Sem sessão válida — limpa tudo, inclusive qualquer token expirado
+        // Isso libera o mutex interno do Supabase para o próximo signIn não travar
+        await supabase.auth.signOut().catch(() => {})
         setUser(null)
         setTenants([])
         setTenantId(null)
         localStorage.removeItem('ag_tenant_id')
       }
       setLoading(false)
-    }).catch(() => {
-      if (!cancelled) setLoading(false)
+    }).catch(async () => {
+      if (!cancelled) {
+        await supabase.auth.signOut().catch(() => {})
+        setLoading(false)
+      }
     })
 
     // Timeout de segurança absoluto: 5s e libera de qualquer jeito
@@ -89,6 +94,8 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function signIn(email, password) {
+    // Garante que não há operação de refresh pendente travando o signIn
+    await supabase.auth.signOut().catch(() => {})
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
     // Garante que tenants são carregados mesmo se onAuthStateChange não disparar
