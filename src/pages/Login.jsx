@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { Leaf, ArrowRight, Mail, Lock, Home, CheckCircle } from 'lucide-react'
+import { Leaf, ArrowRight, Mail, Lock, CheckCircle } from 'lucide-react'
 
 function Logo() {
   return (
@@ -29,29 +29,20 @@ const FEATURES = [
 ]
 
 export default function Login() {
-  const { signIn, signUp } = useAuth()
-  const [mode, setMode]       = useState('login')
+  const { signIn } = useAuth()
   const [email, setEmail]     = useState('')
   const [senha, setSenha]     = useState('')
-  const [fazenda, setFazenda] = useState('')
   const [erro, setErro]       = useState('')
   const [loading, setLoading] = useState(false)
-  const [signupOk, setSignupOk] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setErro('')
     setLoading(true)
     try {
-      if (mode === 'login') {
-        await signIn(email, senha)
-      } else {
-        if (!fazenda.trim()) { setErro('Informe o nome da sua fazenda.'); setLoading(false); return }
-        await signUp(email, senha, fazenda.trim())
-        setSignupOk(true)
-      }
+      await signIn(email, senha)
     } catch (err) {
-      setErro(err.message || 'Erro ao autenticar. Verifique suas credenciais.')
+      setErro('E-mail ou senha incorretos. Verifique suas credenciais.')
     } finally {
       setLoading(false)
     }
@@ -115,108 +106,58 @@ export default function Login() {
 
           <div style={{marginBottom:32}}>
             <h1 style={{fontSize:22,fontWeight:700,color:'var(--text)',letterSpacing:'-.3px',marginBottom:6}}>
-              {mode === 'login' ? 'Bem-vindo de volta' : 'Criar sua conta'}
+              Bem-vindo de volta
             </h1>
             <p style={{fontSize:14,color:'var(--text-muted)'}}>
-              {mode === 'login'
-                ? 'Entre com suas credenciais para continuar.'
-                : 'Preencha os dados para começar gratuitamente.'}
+              Entre com suas credenciais para continuar.
             </p>
           </div>
 
-          {/* Toggle login / signup */}
-          <div style={{display:'flex',marginBottom:28,background:'var(--gray-50)',borderRadius:10,padding:3,border:'1px solid var(--border)'}}>
-            {['login','signup'].map(m => (
-              <button key={m} onClick={() => { setMode(m); setErro('') }} style={{
-                flex:1,padding:'8px 0',border:'none',borderRadius:8,cursor:'pointer',
-                fontWeight:600,fontSize:13,fontFamily:'var(--font)',
-                background: mode===m ? 'white' : 'transparent',
-                color: mode===m ? 'var(--green-dark)' : 'var(--text-muted)',
-                boxShadow: mode===m ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                transition:'all .15s',
-              }}>
-                {m === 'login' ? 'Entrar' : 'Cadastrar'}
-              </button>
-            ))}
-          </div>
-
-          {signupOk ? (
-            <div style={{textAlign:'center',padding:'32px 0'}}>
-              <div style={{
-                width:64,height:64,borderRadius:'50%',
-                background:'var(--green-light)',
-                display:'flex',alignItems:'center',justifyContent:'center',
-                margin:'0 auto 20px',
-              }}>
-                <CheckCircle size={32} color="var(--green)" strokeWidth={2}/>
+          <form onSubmit={handleSubmit} style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div className="form-group">
+              <label>E-mail</label>
+              <div style={{position:'relative'}}>
+                <Mail size={15} color="var(--text-muted)" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}/>
+                <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                  placeholder="seu@email.com" autoFocus required
+                  style={{paddingLeft:36}}/>
               </div>
-              <p style={{fontWeight:700,fontSize:18,marginBottom:8}}>Cadastro realizado!</p>
-              <p style={{fontSize:14,color:'var(--text-muted)',marginBottom:24,lineHeight:1.6}}>
-                Verifique seu e-mail para confirmar a conta e então faça login.
-              </p>
-              <button className="btn btn-primary" style={{width:'100%'}}
-                onClick={() => { setMode('login'); setSignupOk(false) }}>
-                Ir para o login
-              </button>
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} style={{display:'flex',flexDirection:'column',gap:16}}>
-              {mode === 'signup' && (
-                <div className="form-group">
-                  <label>Nome da fazenda</label>
-                  <div style={{position:'relative'}}>
-                    <Home size={15} color="var(--text-muted)" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}/>
-                    <input type="text" value={fazenda} onChange={e=>setFazenda(e.target.value)}
-                      placeholder="Ex: Fazenda São João" autoFocus required
-                      style={{paddingLeft:36}}/>
-                  </div>
-                </div>
-              )}
 
-              <div className="form-group">
-                <label>E-mail</label>
-                <div style={{position:'relative'}}>
-                  <Mail size={15} color="var(--text-muted)" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}/>
-                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                    placeholder="seu@email.com" autoFocus={mode==='login'} required
-                    style={{paddingLeft:36}}/>
-                </div>
+            <div className="form-group">
+              <label>Senha</label>
+              <div style={{position:'relative'}}>
+                <Lock size={15} color="var(--text-muted)" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}/>
+                <input type="password" value={senha} onChange={e=>setSenha(e.target.value)}
+                  placeholder="Sua senha" required
+                  style={{paddingLeft:36}}/>
               </div>
+            </div>
 
-              <div className="form-group">
-                <label>Senha</label>
-                <div style={{position:'relative'}}>
-                  <Lock size={15} color="var(--text-muted)" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}/>
-                  <input type="password" value={senha} onChange={e=>setSenha(e.target.value)}
-                    placeholder={mode==='signup'?'Mínimo 6 caracteres':'Sua senha'} required
-                    style={{paddingLeft:36}}/>
-                </div>
+            {erro && (
+              <div style={{
+                fontSize:13,color:'var(--red)',
+                padding:'10px 14px',
+                background:'var(--red-light)',
+                borderRadius:8,
+                border:'1px solid rgba(163,45,45,0.2)',
+              }}>
+                {erro}
               </div>
+            )}
 
-              {erro && (
-                <div style={{
-                  fontSize:13,color:'var(--red)',
-                  padding:'10px 14px',
-                  background:'var(--red-light)',
-                  borderRadius:8,
-                  border:'1px solid rgba(163,45,45,0.2)',
-                }}>
-                  {erro}
-                </div>
+            <button type="submit" className="btn btn-primary"
+              style={{width:'100%',fontSize:14,padding:'12px',marginTop:4,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}
+              disabled={loading||!email||!senha}>
+              {loading ? 'Aguarde...' : (
+                <>
+                  Entrar
+                  <ArrowRight size={16}/>
+                </>
               )}
+            </button>
+          </form>
 
-              <button type="submit" className="btn btn-primary"
-                style={{width:'100%',fontSize:14,padding:'12px',marginTop:4,display:'flex',alignItems:'center',justifyContent:'center',gap:8}}
-                disabled={loading||!email||!senha}>
-                {loading ? 'Aguarde...' : (
-                  <>
-                    {mode==='login' ? 'Entrar' : 'Criar conta'}
-                    <ArrowRight size={16}/>
-                  </>
-                )}
-              </button>
-            </form>
-          )}
         </div>
       </div>
     </div>

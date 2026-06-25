@@ -162,6 +162,51 @@ function Logo({ size = 'md' }) {
   )
 }
 
+/* ─── BANNER INSTALAR iOS ───────────────────────────────────── */
+function IosBanner() {
+  const [visible, setVisible] = React.useState(() => {
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const isInApp = window.navigator.standalone === true
+    const dismissed = localStorage.getItem('ag_ios_banner') === '1'
+    return isIos && !isInApp && !dismissed
+  })
+
+  if (!visible) return null
+
+  function dismiss() {
+    localStorage.setItem('ag_ios_banner', '1')
+    setVisible(false)
+  }
+
+  return (
+    <div style={{
+      position:'fixed', bottom:'calc(68px + env(safe-area-inset-bottom, 0px))',
+      left:12, right:12, zIndex:600,
+      background:'var(--green-dark)', color:'white',
+      borderRadius:14, padding:'14px 16px',
+      boxShadow:'0 4px 20px rgba(0,0,0,0.25)',
+      display:'flex', alignItems:'flex-start', gap:12,
+    }}>
+      <div style={{fontSize:26,flexShrink:0}}>📲</div>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:4}}>Instalar AgroGestão</div>
+        <div style={{fontSize:12,color:'rgba(255,255,255,0.8)',lineHeight:1.5}}>
+          Toque em <strong style={{color:'white'}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{verticalAlign:'middle',marginBottom:1}}>
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+            </svg>
+          </strong> no Safari e depois em <strong style={{color:'white'}}>"Adicionar à Tela de Início"</strong>
+        </div>
+      </div>
+      <button onClick={dismiss} style={{
+        background:'rgba(255,255,255,0.15)', border:'none', color:'white',
+        borderRadius:8, width:28, height:28, fontSize:16,
+        cursor:'pointer', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center',
+      }}>✕</button>
+    </div>
+  )
+}
+
 /* ─── MOBILE LAYOUT ─────────────────────────────────────────── */
 function MobileLayout({ currentPage, setPage, sair }) {
   const [openSheet, setOpenSheet] = useState(null)
@@ -214,6 +259,8 @@ function MobileLayout({ currentPage, setPage, sair }) {
           <PageContent currentPage={currentPage} setPage={setPage} sair={sair} addRef={addRef}/>
         </div>
       </div>
+
+      <IosBanner/>
 
       {openSheet&&<div onClick={()=>setOpenSheet(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:300}}/>}
 
