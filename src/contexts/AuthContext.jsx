@@ -113,20 +113,23 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function signIn(email, password) {
-    // Fetch direto ao Supabase — sem SDK, sem estado interno, sem travamento
+    // Fetch direto ao endpoint de auth — sem SDK, sem mutex, sem travamento
     const session = await signInDirectFetch(email, password)
     const user = session.user
     if (!user) throw new Error('Usuário não encontrado')
 
-    // Salva sessão no localStorage no formato que o SDK espera
-    const storageKey = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`
-    localStorage.setItem(storageKey, JSON.stringify(session))
+    // Sincroniza o SDK com a sessão recém obtida
+    // Isso é necessário para que queries (.from()) usem o token correto
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    }).catch(() => {})
 
-    // Seta usuário IMEDIATAMENTE — redireciona sem esperar tenants
+    // Redireciona imediatamente sem esperar tenants
     setUser(user)
     setLoading(false)
 
-    // Carrega tenants em background após o redirect
+    // Tenants carregam em background após o redirect
     fetchTenants(user.id).then(list => {
       const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
       setTenants(list)
