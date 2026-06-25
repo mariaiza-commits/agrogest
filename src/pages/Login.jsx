@@ -125,7 +125,10 @@ export default function Login() {
               <label>E-mail</label>
               <div style={{position:'relative'}}>
                 <Mail size={15} color="var(--text-muted)" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}/>
-                <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
+                <input type="email" value={email}
+                  onChange={e=>setEmail(e.target.value)}
+                  onInput={e=>setEmail(e.target.value)}
+                  autoComplete="email"
                   placeholder="seu@email.com" autoFocus required
                   style={{paddingLeft:36}}/>
               </div>
@@ -135,7 +138,10 @@ export default function Login() {
               <label>Senha</label>
               <div style={{position:'relative'}}>
                 <Lock size={15} color="var(--text-muted)" style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)'}}/>
-                <input type="password" value={senha} onChange={e=>setSenha(e.target.value)}
+                <input type="password" value={senha}
+                  onChange={e=>setSenha(e.target.value)}
+                  onInput={e=>setSenha(e.target.value)}
+                  autoComplete="current-password"
                   placeholder="Sua senha" required
                   style={{paddingLeft:36}}/>
               </div>
