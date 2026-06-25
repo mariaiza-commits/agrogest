@@ -229,6 +229,31 @@ tbody tr:hover td { background: var(--gray-50); }
   .login-logo-mobile  { display: block !important; }
 }
 
+/* ─── KPI CARDS ──────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpi-value  { font-size: 17px; font-weight: 800; }
+.kpi-icon   { font-size: 18px; }
+
+@media (max-width: 768px) {
+  .kpi-grid   { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi-card   { padding: 10px 12px; gap: 2px; }
+  .kpi-value  { font-size: 15px; }
+  .kpi-icon   { font-size: 15px; }
+}
+
 /* ─── DASHBOARD GRID ─────────────────────────────── */
 @media (max-width: 900px) {
   .dash-grid { grid-template-columns: 1fr !important; }
