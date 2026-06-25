@@ -40,9 +40,16 @@ export default function Login() {
     setErro('')
     setLoading(true)
     try {
-      await signIn(email, senha)
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 12000)
+      )
+      await Promise.race([signIn(email, senha), timeout])
     } catch (err) {
-      setErro('E-mail ou senha incorretos. Verifique suas credenciais.')
+      if (err.message === 'timeout') {
+        setErro('Tempo esgotado. Verifique sua conexão e tente novamente.')
+      } else {
+        setErro('E-mail ou senha incorretos. Verifique suas credenciais.')
+      }
     } finally {
       setLoading(false)
     }

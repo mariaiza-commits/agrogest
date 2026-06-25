@@ -91,6 +91,14 @@ export function AuthProvider({ children }) {
   async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    // Garante que tenants são carregados mesmo se onAuthStateChange não disparar
+    if (data?.user) {
+      const list = await fetchTenants(data.user.id)
+      const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+      setUser(data.user)
+      setTenants(list)
+      if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
+    }
     return data
   }
 
