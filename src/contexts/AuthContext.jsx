@@ -3,18 +3,28 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
-// Remove token expirado do localStorage antes de qualquer chamada ao Supabase
-function clearExpiredToken() {
+// Verifica se o token salvo ainda é válido SEM fazer chamada de rede
+function getStoredSession() {
   try {
     const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
-    if (!key) return
-    const parsed = JSON.parse(localStorage.getItem(key) ?? '{}')
-    const expiresAt = parsed?.expires_at ?? 0
+    if (!key) return null
+    const parsed = JSON.parse(localStorage.getItem(key) ?? 'null')
+    if (!parsed) return null
+
+    // Suporta dois formatos de armazenamento do Supabase JS v2
+    const session = parsed.currentSession ?? parsed
+    const expiresAt = session?.expires_at ?? parsed?.expiresAt ?? 0
+
     if (Date.now() / 1000 > expiresAt) {
+      // Token expirado — limpa tudo imediatamente
       localStorage.removeItem(key)
       localStorage.removeItem('ag_tenant_id')
+      return null
     }
-  } catch {}
+    return session
+  } catch {
+    return null
+  }
 }
 
 async function fetchTenants(userId) {
@@ -36,57 +46,34 @@ function pickTenant(list, saved) {
 }
 
 export function AuthProvider({ children }) {
-  // Limpa token expirado de forma síncrona — antes de qualquer coisa
-  clearExpiredToken()
-
-  const savedTenant = localStorage.getItem('ag_tenant_id')
+  // Verifica sessão localmente — síncrono, sem rede
+  const storedSession = getStoredSession()
+  const savedTenant   = storedSession ? localStorage.getItem('ag_tenant_id') : null
 
   const [user,     setUser]     = useState(null)
   const [tenants,  setTenants]  = useState([])
   const [tenantId, setTenantId] = useState(savedTenant)
-  const [loading,  setLoading]  = useState(!savedTenant)
+  const [loading,  setLoading]  = useState(!!storedSession) // loading só se há sessão válida
 
   useEffect(() => {
     let cancelled = false
 
-    // getSession() agora retorna instantaneamente do localStorage (sem rede)
-    // porque autoRefreshToken está desativado no cliente Supabase
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (cancelled) return
-
-      if (session?.user) {
-        // Tenta renovar o token se estiver próximo de expirar (< 5 min)
-        const expiresAt = session.expires_at ?? 0
-        if (Date.now() / 1000 > expiresAt - 300) {
-          const { data: refreshed } = await supabase.auth.refreshSession()
-          if (refreshed?.session) {
-            session = refreshed.session
-          } else {
-            // Não conseguiu renovar — limpa e vai para login
-            setUser(null); setTenants([]); setTenantId(null)
-            localStorage.removeItem('ag_tenant_id')
-            setLoading(false)
-            return
-          }
-        }
-
-        const list = await fetchTenants(session.user.id)
+    if (storedSession?.user) {
+      // Sessão válida no localStorage — carrega tenants em background
+      fetchTenants(storedSession.user.id).then(list => {
         if (cancelled) return
         const tid = pickTenant(list, savedTenant)
-        setUser(session.user)
+        setUser(storedSession.user)
         setTenants(list)
         if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
-      } else {
-        setUser(null); setTenants([]); setTenantId(null)
-        localStorage.removeItem('ag_tenant_id')
-      }
-      setLoading(false)
-    }).catch(() => {
-      if (!cancelled) setLoading(false)
-    })
+        setLoading(false)
+      }).catch(() => {
+        if (!cancelled) setLoading(false)
+      })
+    }
+    // Se não há sessão, loading já é false — mostra login direto
 
-    const t = setTimeout(() => { if (!cancelled) setLoading(false) }, 5000)
-
+    // Escuta mudanças de auth (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return
       if (event === 'SIGNED_IN' && session?.user) {
@@ -103,6 +90,8 @@ export function AuthProvider({ children }) {
         setLoading(false)
       }
     })
+
+    const t = setTimeout(() => { if (!cancelled) setLoading(false) }, 5000)
 
     return () => { cancelled = true; clearTimeout(t); subscription.unsubscribe() }
   }, [])
