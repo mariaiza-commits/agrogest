@@ -27,7 +27,7 @@ function KpiCard({ icon, label, value, sub, color = 'var(--text)', bg, badge }) 
         {badge && <span style={{ fontSize: 10, background: badge.bg, color: badge.color, borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>{badge.text}</span>}
         <span style={{ fontSize: 18 }}>{icon}</span>
       </div>
-      <div style={{ fontSize: 'clamp(14px, 2vw, 20px)', fontWeight: 800, color, fontFamily: 'var(--font-display)', lineHeight: 1.15, wordBreak: 'break-word' }}>{value}</div>
+      <div style={{ fontSize: 17, fontWeight: 800, color, fontFamily: 'var(--font-display)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>}
     </div>
   )
@@ -364,23 +364,34 @@ function GraficoBarras({ title, labels, data, color }) {
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '14px 18px' }}>
       <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14 }}>{title}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {labels.map((label, i) => (
-          <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ minWidth: 60, fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
-            <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 6, height: 28, overflow: 'hidden', position: 'relative' }}>
-              <div style={{
-                width: Math.min(data[i] / max * 100, 100) + '%',
-                height: '100%',
-                background: color,
-                borderRadius: 4,
-                transition: 'width .4s',
-                display: 'flex', alignItems: 'center', paddingLeft: 6,
-              }}>
-                <span style={{ fontSize: 11, color: 'white', fontWeight: 700, whiteSpace: 'nowrap' }}>{fmt(data[i])}</span>
+        {labels.map((label, i) => {
+          const pct = Math.min(data[i] / max * 100, 100)
+          const inside = pct > 35
+          return (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ minWidth: 70, fontSize: 12, fontWeight: 600, color: 'var(--text)', textAlign: 'right' }}>{label}</div>
+              <div style={{ flex: 1, background: 'var(--bg)', borderRadius: 6, height: 26, position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <div style={{
+                  width: pct + '%',
+                  minWidth: 8,
+                  height: '100%',
+                  background: color,
+                  borderRadius: 6,
+                  transition: 'width .4s',
+                  flexShrink: 0,
+                }}/>
+                <span style={{
+                  position: 'absolute',
+                  left: inside ? '8px' : `calc(${pct}% + 8px)`,
+                  fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
+                  color: inside ? 'white' : 'var(--text)',
+                }}>
+                  {fmt(data[i])}
+                </span>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
