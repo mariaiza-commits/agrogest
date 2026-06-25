@@ -21,24 +21,23 @@ const pct = (v, t) => t > 0 ? ((v / t) * 100).toFixed(1) + '%' : '—'
 const cor = (v) => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-muted)'
 
 // ─── KPI CARD ───────────────────────────────────────────────
-function KpiCard({ icon, label, value, sub, color = 'var(--text)', bg, badge }) {
-  const isMobile = useIsMobile()
+function KpiCard({ icon, label, value, sub, color = 'var(--text)', bg, badge, compact }) {
   return (
     <div style={{
       background: bg ?? 'var(--surface)',
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius)',
-      padding: isMobile ? '10px 12px' : '16px 20px',
+      padding: compact ? '10px 12px' : '16px 20px',
       display: 'flex',
       flexDirection: 'column',
-      gap: isMobile ? 2 : 4,
+      gap: compact ? 2 : 4,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.5px' }}>{label}</span>
         {badge && <span style={{ fontSize: 10, background: badge.bg, color: badge.color, borderRadius: 4, padding: '1px 6px', fontWeight: 600 }}>{badge.text}</span>}
-        <span style={{ fontSize: isMobile ? 15 : 18 }}>{icon}</span>
+        <span style={{ fontSize: compact ? 15 : 18 }}>{icon}</span>
       </div>
-      <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 800, color, fontFamily: 'var(--font-display)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
+      <div style={{ fontSize: compact ? 15 : 17, fontWeight: 800, color, fontFamily: 'var(--font-display)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</div>
       {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sub}</div>}
     </div>
   )
@@ -159,12 +158,12 @@ export default function Dashboard() {
 
       {/* KPI CARDS — largura total */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill, minmax(140px, 1fr))', gap: isMobile ? 8 : 10 }}>
-        <KpiCard icon="💰" label="Receita" value={fmt(receita)} sub={`A receber: ${fmt(kpis?.total_a_receber)}`} color="var(--teal)" />
-        <KpiCard icon="💸" label="Custos" value={fmt(custo)} sub={`A pagar: ${fmt(kpis?.total_a_pagar)}`} color={custo > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
-        <KpiCard icon="📈" label="Lucro" value={fmt(lucro)} sub={`Margem: ${margem}%`} color={cor(lucro)} />
-        <KpiCard icon="📦" label="Caixas" value={caixas.toLocaleString('pt-BR')} sub="vendidas no período" color="var(--text)" />
-        <KpiCard icon="🏷️" label="Preço médio/cx" value={precoMed > 0 ? fmt(precoMed) : '—'} sub="receita ÷ caixas" color="var(--text)" />
-        <KpiCard icon="%" label="Margem" value={margem > 0 ? `${margem}%` : '—'} sub="lucro ÷ receita" color={Number(margem) >= 30 ? 'var(--green)' : Number(margem) > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
+        <KpiCard compact={isMobile} icon="💰" label="Receita" value={fmt(receita)} sub={`A receber: ${fmt(kpis?.total_a_receber)}`} color="var(--teal)" />
+        <KpiCard compact={isMobile} icon="💸" label="Custos" value={fmt(custo)} sub={`A pagar: ${fmt(kpis?.total_a_pagar)}`} color={custo > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
+        <KpiCard compact={isMobile} icon="📈" label="Lucro" value={fmt(lucro)} sub={`Margem: ${margem}%`} color={cor(lucro)} />
+        <KpiCard compact={isMobile} icon="📦" label="Caixas" value={caixas.toLocaleString('pt-BR')} sub="vendidas no período" color="var(--text)" />
+        <KpiCard compact={isMobile} icon="🏷️" label="Preço médio/cx" value={precoMed > 0 ? fmt(precoMed) : '—'} sub="receita ÷ caixas" color="var(--text)" />
+        <KpiCard compact={isMobile} icon="%" label="Margem" value={margem > 0 ? `${margem}%` : '—'} sub="lucro ÷ receita" color={Number(margem) >= 30 ? 'var(--green)' : Number(margem) > 0 ? 'var(--amber)' : 'var(--text-muted)'} />
       </div>
 
       {/* ALERTAS DE ANÁLISE */}

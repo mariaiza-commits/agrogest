@@ -1,7 +1,6 @@
-const CACHE_NAME = 'agrogestao-v4'
+const CACHE_NAME = 'agrogestao-v5'
 
 self.addEventListener('install', event => {
-  // Ativa imediatamente sem esperar o SW antigo fechar
   self.skipWaiting()
 })
 
@@ -10,12 +9,9 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
-      .then(() => {
-        // Avisa todos os clientes abertos para recarregar com a versão nova
-        return self.clients.matchAll({ type: 'window' }).then(clients => {
-          clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }))
-        })
-      })
+      .then(() => self.clients.matchAll({ type: 'window' })
+        .then(clients => clients.forEach(c => c.postMessage({ type: 'SW_UPDATED' })))
+      )
   )
 })
 
@@ -26,7 +22,7 @@ self.addEventListener('fetch', event => {
   if (url.startsWith('chrome-extension://')) return
   if (event.request.method !== 'GET') return
 
-  // index.html: SEMPRE da rede — garante versão nova a cada reload
+  // index.html: sempre da rede
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => caches.match('/offline.html'))
@@ -40,9 +36,8 @@ self.addEventListener('fetch', event => {
       caches.match(event.request).then(cached => {
         if (cached) return cached
         return fetch(event.request).then(response => {
-          if (response.status === 200) {
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()))
-          }
+          const clone = response.clone() // clone ANTES de qualquer uso assíncrono
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
           return response
         })
       })
@@ -50,13 +45,12 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Demais recursos: rede primeiro, cache como fallback offline
+  // Demais recursos: rede primeiro, cache como fallback
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        if (response.status === 200) {
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()))
-        }
+        const clone = response.clone() // clone ANTES de qualquer uso assíncrono
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
         return response
       })
       .catch(() => caches.match(event.request))
