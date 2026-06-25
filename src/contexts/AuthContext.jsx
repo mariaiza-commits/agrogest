@@ -144,21 +144,18 @@ export function AuthProvider({ children }) {
     const user = session.user
     if (!user) throw new Error('Usuário não encontrado')
 
-    // Salva sessão no localStorage para o próximo carregamento
+    // Salva sessão no localStorage
     const storageKey = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`
     localStorage.setItem(storageKey, JSON.stringify(session))
 
-    // Redireciona imediatamente — sem esperar nada
-    setUser(user)
-    setLoading(false)
+    // Busca tenants para salvar o tenant_id antes de recarregar
+    const list = await fetchTenantsRaw(user.id, session.access_token)
+    const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+    if (tid) localStorage.setItem('ag_tenant_id', tid)
 
-    // Tenants via fetch puro em background
-    fetchTenantsRaw(user.id, session.access_token).then(list => {
-      const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
-      setTenants(list)
-      if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
-    }).catch(() => {})
-
+    // Recarrega a página — garante que o SDK Supabase reinicia com o token correto
+    // Sem isso o dashboard não consegue fazer queries (SDK não tem token em memória)
+    window.location.replace('/')
     return session
   }
 
