@@ -1,4 +1,14 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
+
+function useIsMobile() {
+  const [m, setM] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const h = () => setM(window.innerWidth < 768)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
+  return m
+}
 import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from 'chart.js'
 import { supabase } from '../lib/supabase'
@@ -12,7 +22,7 @@ const cor = (v) => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text-m
 
 // ─── KPI CARD ───────────────────────────────────────────────
 function KpiCard({ icon, label, value, sub, color = 'var(--text)', bg, badge }) {
-  const isMobile = window.innerWidth < 768
+  const isMobile = useIsMobile()
   return (
     <div style={{
       background: bg ?? 'var(--surface)',
@@ -131,7 +141,7 @@ export default function Dashboard() {
 
   const temAlertasFinanceiros = atraso.length > 0 || vencer.length > 0 || receber.length > 0
 
-  const isMobile = window.innerWidth < 768
+  const isMobile = useIsMobile()
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 20 }}>
