@@ -1,8 +1,9 @@
-const CACHE_NAME = 'agrogestao-v1'
+const CACHE_NAME = 'agrogestao-v2'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/static/js/main.js',
+  '/offline.html',
+  '/manifest.json',
 ]
 
 // Instala e faz cache dos arquivos estáticos
@@ -15,7 +16,7 @@ self.addEventListener('install', event => {
   self.skipWaiting()
 })
 
-// Ativa e limpa caches antigos
+// Ativa e limpa caches de versões anteriores
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -27,25 +28,31 @@ self.addEventListener('activate', event => {
 
 // Estratégia: Network first, cache fallback
 self.addEventListener('fetch', event => {
-  // Não faz cache de chamadas à API do Supabase
-  if (event.request.url.includes('supabase.co')) return
+  const url = event.request.url
+
+  // Não intercepta chamadas ao Supabase, extensões do Chrome ou não-GET
+  if (url.includes('supabase.co')) return
+  if (url.startsWith('chrome-extension://')) return
+  if (event.request.method !== 'GET') return
 
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Salva no cache se for GET bem sucedido
-        if (event.request.method === 'GET' && response.status === 200) {
+        if (response.status === 200) {
           const clone = response.clone()
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
         }
         return response
       })
       .catch(() => {
-        // Offline: usa cache
         return caches.match(event.request).then(cached => {
           if (cached) return cached
-          // Fallback para index.html (SPA)
-          return caches.match('/index.html')
+          // Para navegação SPA, retorna index.html do cache
+          if (event.request.mode === 'navigate') {
+            return caches.match('/index.html')
+          }
+          // Para outros recursos offline, mostra página offline
+          return caches.match('/offline.html')
         })
       })
   )

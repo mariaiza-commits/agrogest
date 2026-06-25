@@ -21,12 +21,24 @@
       "purpose": "any maskable"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#2d6a2d",
+  "theme_color": "#2d6a0a",
   "background_color": "#f5f3ee",
-  "orientation": "portrait",
+  "orientation": "portrait-primary",
   "scope": "/",
   "lang": "pt-BR",
-  "categories": ["productivity", "business"]
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/",
+      "description": "Ver painel principal"
+    },
+    {
+      "name": "Vendas",
+      "url": "/?page=vendas",
+      "description": "Registrar venda"
+    }
+  ]
 }
