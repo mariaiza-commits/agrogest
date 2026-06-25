@@ -3,13 +3,28 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App'
 
-// Registra o Service Worker para PWA (offline + instalável)
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/service-worker.js')
-      .then(reg => console.log('SW registrado:', reg.scope))
-      .catch(err => console.warn('SW falhou:', err))
+    navigator.serviceWorker.register('/service-worker.js').then(reg => {
+      // Quando o SW atualizar, recarrega a página para pegar a versão nova
+      reg.addEventListener('updatefound', () => {
+        const newWorker = reg.installing
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'activated') {
+              window.location.reload()
+            }
+          })
+        }
+      })
+    }).catch(() => {})
+
+    // Recebe mensagem do SW pedindo reload
+    navigator.serviceWorker.addEventListener('message', event => {
+      if (event.data?.type === 'SW_UPDATED') {
+        window.location.reload()
+      }
+    })
   })
 }
 

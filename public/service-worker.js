@@ -1,45 +1,47 @@
-const CACHE_NAME = 'agrogestao-v3'
+const CACHE_NAME = 'agrogestao-v4'
 
-// Só cacheia assets estáticos com hash (JS/CSS) — NUNCA o index.html
 self.addEventListener('install', event => {
+  // Ativa imediatamente sem esperar o SW antigo fechar
   self.skipWaiting()
 })
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+      .then(() => {
+        // Avisa todos os clientes abertos para recarregar com a versão nova
+        return self.clients.matchAll({ type: 'window' }).then(clients => {
+          clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' }))
+        })
+      })
   )
-  self.clients.claim()
 })
 
 self.addEventListener('fetch', event => {
   const url = event.request.url
 
-  // Ignora chamadas ao Supabase, extensões e não-GET
   if (url.includes('supabase.co')) return
   if (url.startsWith('chrome-extension://')) return
   if (event.request.method !== 'GET') return
 
-  // index.html: SEMPRE busca da rede (nunca serve do cache)
-  // Isso garante que o app atualiza ao recarregar
-  if (event.request.mode === 'navigate' || url.endsWith('/') || url.endsWith('/index.html')) {
+  // index.html: SEMPRE da rede — garante versão nova a cada reload
+  if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => caches.match('/offline.html'))
     )
     return
   }
 
-  // Arquivos JS/CSS com hash: cache permanente (são únicos por versão)
+  // Arquivos com hash (/static/): cache permanente
   if (url.includes('/static/')) {
     event.respondWith(
       caches.match(event.request).then(cached => {
         if (cached) return cached
         return fetch(event.request).then(response => {
           if (response.status === 200) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()))
           }
           return response
         })
@@ -48,13 +50,12 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Outros recursos: rede primeiro, cache como fallback
+  // Demais recursos: rede primeiro, cache como fallback offline
   event.respondWith(
     fetch(event.request)
       .then(response => {
         if (response.status === 200) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, response.clone()))
         }
         return response
       })
