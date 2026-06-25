@@ -4,8 +4,7 @@ import { supabase } from '../lib/supabase'
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL || 'https://juqvvdnybhwelctlhdlr.supabase.co'
 const SUPABASE_KEY = process.env.REACT_APP_SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp1cXZ2ZG55Ymh3ZWxjdGxoZGxyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczMzYxMTcsImV4cCI6MjA5MjkxMjExN30.3sddN3zuQvwnUHzO4yUpQVnIA07qY6H23PfeHTau0fg'
 
-// Login direto via fetch — bypassa completamente o SDK do Supabase
-// Evita qualquer problema de estado interno do cliente
+// Todas as chamadas ao Supabase via fetch puro — zero SDK, zero travamento
 async function signInDirectFetch(email, password) {
   const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -14,7 +13,18 @@ async function signInDirectFetch(email, password) {
   })
   const json = await res.json()
   if (!res.ok) throw new Error(json.error_description || json.msg || 'Erro ao fazer login')
-  return json // { access_token, refresh_token, expires_at, user, ... }
+  return json
+}
+
+async function fetchTenantsRaw(userId, accessToken) {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/user_tenants?select=tenant_id,role,tenants(id,nome,slug)&user_id=eq.${userId}`,
+      { headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${accessToken}` } }
+    )
+    if (!res.ok) return []
+    return await res.json() ?? []
+  } catch { return [] }
 }
 
 const AuthContext = createContext(null)
@@ -75,8 +85,7 @@ export function AuthProvider({ children }) {
     let cancelled = false
 
     if (storedSession?.user) {
-      // Sessão válida no localStorage — carrega tenants em background
-      fetchTenants(storedSession.user.id).then(list => {
+      fetchTenantsRaw(storedSession.user.id, storedSession.access_token).then(list => {
         if (cancelled) return
         const tid = pickTenant(list, savedTenant)
         setUser(storedSession.user)
@@ -118,19 +127,16 @@ export function AuthProvider({ children }) {
     const user = session.user
     if (!user) throw new Error('Usuário não encontrado')
 
-    // Sincroniza o SDK com a sessão recém obtida
-    // Isso é necessário para que queries (.from()) usem o token correto
-    await supabase.auth.setSession({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-    }).catch(() => {})
+    // Salva sessão no localStorage para o próximo carregamento
+    const storageKey = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`
+    localStorage.setItem(storageKey, JSON.stringify(session))
 
-    // Redireciona imediatamente sem esperar tenants
+    // Redireciona imediatamente — sem esperar nada
     setUser(user)
     setLoading(false)
 
-    // Tenants carregam em background após o redirect
-    fetchTenants(user.id).then(list => {
+    // Tenants via fetch puro em background
+    fetchTenantsRaw(user.id, session.access_token).then(list => {
       const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
       setTenants(list)
       if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
