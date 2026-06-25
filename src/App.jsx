@@ -180,24 +180,37 @@ function MobileLayout({ currentPage, setPage, sair }) {
       <div style={{
         position:'fixed',top:0,left:0,right:0,zIndex:200,
         background:'white',borderBottom:'1px solid var(--border)',
-        height:52,display:'flex',alignItems:'center',
-        justifyContent:'space-between',padding:'0 16px',
+        height:54,display:'flex',alignItems:'center',
+        justifyContent:'space-between',padding:'0 14px',
+        gap:8,
       }}>
-        <Logo/>
-        <span style={{fontSize:14,fontWeight:600,color:'var(--text)',position:'absolute',left:'50%',transform:'translateX(-50%)',whiteSpace:'nowrap'}}>
-          {PAGE_LABELS[currentPage]??currentPage}
-        </span>
-        <div>
-          {ADD_LABELS[currentPage]&&(
-            <button onClick={()=>addRef.current?.()} className="btn btn-primary btn-sm">
-              {ADD_LABELS[currentPage]}
-            </button>
-          )}
-        </div>
+        {/* Logo só no Dashboard, senão mostra o título */}
+        {currentPage === 'Dashboard'
+          ? <Logo/>
+          : <span style={{fontSize:15,fontWeight:700,color:'var(--text)',flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+              {PAGE_LABELS[currentPage]??currentPage}
+            </span>
+        }
+        {/* Botão de adicionar — ícone "+" no mobile */}
+        {ADD_LABELS[currentPage] && (
+          <button
+            onClick={()=>addRef.current?.()}
+            className="btn btn-primary btn-sm"
+            style={{flexShrink:0,display:'flex',alignItems:'center',gap:4}}
+          >
+            <span style={{fontSize:16,lineHeight:1}}>+</span>
+            <span style={{fontSize:12}}>Novo</span>
+          </button>
+        )}
       </div>
 
-      <div style={{paddingTop:60,paddingBottom:'calc(70px + env(safe-area-inset-bottom, 0px))'}}>
-        <div style={{padding:'12px 16px'}}>
+      <div style={{
+        paddingTop:54,
+        paddingBottom:'calc(68px + env(safe-area-inset-bottom, 0px))',
+        paddingLeft:'env(safe-area-inset-left, 0px)',
+        paddingRight:'env(safe-area-inset-right, 0px)',
+      }}>
+        <div style={{padding:'14px 12px'}}>
           <PageContent currentPage={currentPage} setPage={setPage} sair={sair} addRef={addRef}/>
         </div>
       </div>
@@ -236,9 +249,11 @@ function MobileLayout({ currentPage, setPage, sair }) {
       <nav style={{
         position:'fixed',bottom:0,left:0,right:0,
         background:'white',borderTop:'1px solid var(--border)',
-        display:'flex',justifyContent:'space-around',alignItems:'flex-start',
-        padding:'8px 0',paddingBottom:'calc(8px + env(safe-area-inset-bottom, 0px))',
+        display:'flex',justifyContent:'space-around',alignItems:'center',
+        paddingTop:6,
+        paddingBottom:'calc(6px + env(safe-area-inset-bottom, 0px))',
         zIndex:500,
+        boxShadow:'0 -2px 12px rgba(0,0,0,0.07)',
       }}>
         {MOBILE_TABS.map(tab=>{
           const active = isTabActive(tab,currentPage)
@@ -246,15 +261,20 @@ function MobileLayout({ currentPage, setPage, sair }) {
           const highlighted = active || so
           return(
             <button key={tab.id} onClick={()=>pressTab(tab)} style={{
-              display:'flex',flexDirection:'column',alignItems:'center',gap:3,
-              minWidth:60,minHeight:44,justifyContent:'center',
+              display:'flex',flexDirection:'column',alignItems:'center',gap:2,
+              flex:1,minHeight:50,justifyContent:'center',
               cursor:'pointer',WebkitTapHighlightColor:'transparent',
-              border:'none',padding:'4px 8px',
-              borderRadius:10,
-              background: highlighted ? 'var(--green-light)' : 'none',
+              border:'none',background:'none',padding:'4px 0',
             }}>
-              <tab.Icon size={22} color={highlighted?'var(--green)':'var(--text-muted)'} strokeWidth={highlighted?2.2:1.8}/>
-              <span style={{fontSize:10,fontWeight:highlighted?600:400,color:highlighted?'var(--green-dark)':'var(--text-muted)'}}>{tab.label}</span>
+              <div style={{
+                width:40,height:28,borderRadius:14,
+                display:'flex',alignItems:'center',justifyContent:'center',
+                background: highlighted ? 'var(--green-light)' : 'transparent',
+                transition:'background .15s',
+              }}>
+                <tab.Icon size={20} color={highlighted?'var(--green)':'var(--text-muted)'} strokeWidth={highlighted?2.2:1.8}/>
+              </div>
+              <span style={{fontSize:10,fontWeight:highlighted?600:400,color:highlighted?'var(--green)':'var(--text-muted)'}}>{tab.label}</span>
             </button>
           )
         })}
