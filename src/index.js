@@ -3,13 +3,13 @@ import ReactDOM from 'react-dom/client'
 import './index.css'
 import App from './App'
 
-// Registra SW para PWA — força atualização imediata se há nova versão
+// Remove qualquer service worker existente e limpa todos os caches
+// Isso elimina de vez qualquer problema de cache/tela travada
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js').then(reg => {
-      reg.update()
-    }).catch(() => {})
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister())
   })
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)))
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'))
