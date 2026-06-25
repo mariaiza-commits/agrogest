@@ -3,15 +3,12 @@ import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
-// Apaga o token do Supabase do localStorage se estiver expirado
-// Isso evita que getSession() tente renovar e trave tudo
+// Remove token expirado do localStorage antes de qualquer chamada ao Supabase
 function clearExpiredToken() {
   try {
     const key = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
     if (!key) return
-    const raw = localStorage.getItem(key)
-    if (!raw) return
-    const parsed = JSON.parse(raw)
+    const parsed = JSON.parse(localStorage.getItem(key) ?? '{}')
     const expiresAt = parsed?.expires_at ?? 0
     if (Date.now() / 1000 > expiresAt) {
       localStorage.removeItem(key)
@@ -39,7 +36,7 @@ function pickTenant(list, saved) {
 }
 
 export function AuthProvider({ children }) {
-  // Apaga token expirado ANTES de qualquer coisa — síncrono, instantâneo
+  // Limpa token expirado de forma síncrona — antes de qualquer coisa
   clearExpiredToken()
 
   const savedTenant = localStorage.getItem('ag_tenant_id')
@@ -52,10 +49,27 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let cancelled = false
 
+    // getSession() agora retorna instantaneamente do localStorage (sem rede)
+    // porque autoRefreshToken está desativado no cliente Supabase
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return
 
       if (session?.user) {
+        // Tenta renovar o token se estiver próximo de expirar (< 5 min)
+        const expiresAt = session.expires_at ?? 0
+        if (Date.now() / 1000 > expiresAt - 300) {
+          const { data: refreshed } = await supabase.auth.refreshSession()
+          if (refreshed?.session) {
+            session = refreshed.session
+          } else {
+            // Não conseguiu renovar — limpa e vai para login
+            setUser(null); setTenants([]); setTenantId(null)
+            localStorage.removeItem('ag_tenant_id')
+            setLoading(false)
+            return
+          }
+        }
+
         const list = await fetchTenants(session.user.id)
         if (cancelled) return
         const tid = pickTenant(list, savedTenant)
@@ -87,8 +101,6 @@ export function AuthProvider({ children }) {
         setUser(null); setTenants([]); setTenantId(null)
         localStorage.removeItem('ag_tenant_id')
         setLoading(false)
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        setUser(session.user)
       }
     })
 
