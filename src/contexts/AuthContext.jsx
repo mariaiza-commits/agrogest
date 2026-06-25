@@ -102,16 +102,17 @@ export function AuthProvider({ children }) {
     let cancelled = false
 
     if (storedSession?.user) {
+      // Seta usuário e tenantId IMEDIATAMENTE — páginas carregam sem esperar
+      setUser(storedSession.user)
+      setLoading(false)
+
+      // Tenants em background
       fetchTenantsRaw(storedSession.user.id, storedSession.access_token).then(list => {
         if (cancelled) return
         const tid = pickTenant(list, savedTenant)
-        setUser(storedSession.user)
         setTenants(list)
         if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
-        setLoading(false)
-      }).catch(() => {
-        if (!cancelled) setLoading(false)
-      })
+      }).catch(() => {})
     }
     // Se não há sessão, loading já é false — mostra login direto
 
