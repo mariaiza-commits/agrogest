@@ -1,6 +1,17 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { Leaf, ArrowRight, Mail, Lock, CheckCircle } from 'lucide-react'
+
+// Quando o login abre, limpa qualquer sessão anterior do Supabase
+// Garante que signInWithPassword sempre parte de um estado limpo
+function clearAllSupabaseSessions() {
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sb-'))
+      .forEach(k => localStorage.removeItem(k))
+    localStorage.removeItem('ag_tenant_id')
+  } catch {}
+}
 
 function Logo() {
   return (
@@ -34,6 +45,10 @@ export default function Login() {
   const [senha, setSenha]     = useState('')
   const [erro, setErro]       = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    clearAllSupabaseSessions()
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
