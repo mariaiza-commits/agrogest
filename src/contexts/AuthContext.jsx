@@ -113,20 +113,26 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function signIn(email, password) {
-    // Usa fetch direto — bypass total do SDK, sem estado interno, sem mutex
+    // Fetch direto ao Supabase — sem SDK, sem estado interno, sem travamento
     const session = await signInDirectFetch(email, password)
     const user = session.user
     if (!user) throw new Error('Usuário não encontrado')
 
-    // Salva sessão no formato que o SDK do Supabase espera
+    // Salva sessão no localStorage no formato que o SDK espera
     const storageKey = `sb-${new URL(SUPABASE_URL).hostname.split('.')[0]}-auth-token`
     localStorage.setItem(storageKey, JSON.stringify(session))
 
-    const list = await fetchTenants(user.id)
-    const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+    // Seta usuário IMEDIATAMENTE — redireciona sem esperar tenants
     setUser(user)
-    setTenants(list)
-    if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
+    setLoading(false)
+
+    // Carrega tenants em background após o redirect
+    fetchTenants(user.id).then(list => {
+      const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+      setTenants(list)
+      if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
+    }).catch(() => {})
+
     return session
   }
 
