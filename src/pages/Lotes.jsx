@@ -35,7 +35,7 @@ const TIPO_BG = {
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────
 export default function Lotes({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   // dados gerais
   const [lotes, setLotes]       = useState([])
   const [resumo, setResumo]     = useState({})
@@ -103,7 +103,7 @@ export default function Lotes({ onAddBtn }) {
       const sugs = (vs2 ?? []).map(v => v.nome).filter(Boolean)
       setVarSugestoes(sugs)
       setVarCadComp(vs2 ?? [])
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       if (!silencioso) setLoading(false)
     }
   }, [])

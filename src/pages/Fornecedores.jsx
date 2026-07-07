@@ -7,7 +7,7 @@ const CATS = ['geral','insumos','servicos','equipamentos','transporte','outros']
 const EMPTY = { nome:'', cpf_cnpj:'', telefone:'', email:'', categoria:'geral', observacoes:'' }
 
 export default function Fornecedores({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   const [fornecedores, setFornecedores] = useState([])
   const [historico, setHistorico]       = useState({})
   const [loading, setLoading]           = useState(true)
@@ -19,7 +19,7 @@ export default function Fornecedores({ onAddBtn }) {
   const [busca, setBusca]               = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
+  useEffect(() => { load() }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [])
 
   async function load() {
@@ -31,7 +31,7 @@ export default function Fornecedores({ onAddBtn }) {
     ])
     setFornecedores(fs ?? [])
     const h = {}; (hs ?? []).forEach(r => { h[r.supplier_id] = r }); setHistorico(h)
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

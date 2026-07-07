@@ -7,7 +7,7 @@ const TIPOS = ['Adubação','Irrigação','Pulverização','Capina','Poda','Colh
 const EMPTY = { lote_id:'', setor_id:'', tipo_atividade:'Adubação', insumo_id:'', frequencia_dias:'30', data_inicio:today(), proxima_execucao:today(), ativo:true, observacoes:'' }
 
 export default function Programacao({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   const [lotes, setLotes]     = useState([])
   const [setores, setSetores] = useState([])
   const [insumos, setInsumos] = useState([])
@@ -21,7 +21,7 @@ export default function Programacao({ onAddBtn }) {
   const [viewMode, setViewMode] = useState('calendario') // calendario | lista
   const lotesRef = React.useRef([])
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
+  useEffect(() => { load() }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [lotes])
 
   async function load() {
@@ -37,7 +37,7 @@ export default function Programacao({ onAddBtn }) {
     lotesRef.current = ls??[]
     setLotes(ls??[]); setSetores(sts??[]); setInsumos(ins??[])
     setProgr(prg??[]); setAlertas(ale??[])
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

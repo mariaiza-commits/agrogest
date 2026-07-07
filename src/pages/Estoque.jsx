@@ -23,7 +23,7 @@ const COLS_MOV = [
 ]
 
 export default function Estoque({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   const [insumos, setInsumos]   = useState([])
   const [alertas, setAlertas]   = useState([])
   const [movs, setMovs]         = useState([])
@@ -36,7 +36,7 @@ export default function Estoque({ onAddBtn }) {
   const [editMovId, setEditMovId] = useState(null)
   const [saving, setSaving]     = useState(false)
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
+  useEffect(() => { load() }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModalIns()) }, [insumos])
 
   async function load() {
@@ -48,7 +48,7 @@ export default function Estoque({ onAddBtn }) {
       supabase.from('movimentacoes_estoque').select('*,insumos(nome)').order('data',{ascending:false}).limit(50),
     ])
     setInsumos(ins??[]); setAlertas(ale??[]); setMovs(mv??[])
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

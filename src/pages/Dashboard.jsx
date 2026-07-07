@@ -3,6 +3,7 @@ import { Bar } from 'react-chartjs-2'
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Tooltip } from 'chart.js'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
+import { useAuth } from '../contexts/AuthContext'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip)
 
@@ -80,6 +81,7 @@ function DashboardSkeleton() {
 
 // ─── MAIN ────────────────────────────────────────────────────
 export default function Dashboard() {
+  const { handleAuthError } = useAuth()
   const [kpis, setKpis]       = useState(null)
   const [lotes, setLotes]     = useState([])
   const [culturas, setCulturas] = useState([])
@@ -126,8 +128,8 @@ export default function Dashboard() {
       setVencer(pagar7d ?? [])
       setAtraso(emAtraso ?? [])
       setReceber(receberPend ?? [])
-    } catch {
-      // Mostra painel vazio em vez de travar infinitamente
+    } catch (e) {
+      handleAuthError(e)
     } finally {
       setLoading(false)
     }

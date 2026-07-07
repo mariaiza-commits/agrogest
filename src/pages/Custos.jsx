@@ -16,7 +16,7 @@ const COLS_EXPORT = [
 ]
 
 export default function Custos({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   const [lotes, setLotes]           = useState([])
   const [categorias, setCategorias] = useState([])
   const [custos, setCustos]         = useState([])
@@ -43,7 +43,7 @@ export default function Custos({ onAddBtn }) {
   const [pagData, setPagData]       = useState(today())
   const lotesRef = React.useRef([])
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
+  useEffect(() => { load() }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [lotes])
   useEffect(() => { aplicarFiltros() }, [custos, filtro, dataIni, dataFim, ordem])
 
@@ -61,7 +61,7 @@ export default function Custos({ onAddBtn }) {
     const forns_res = await supabase.from('suppliers').select('id,nome,categoria').is('deleted_at',null).order('nome')
     setFornecedores(forns_res.data ?? [])
     setSelecionados([])
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 const EMPTY = { nome:'', telefone:'', email:'', cpf_cnpj:'', observacoes:'' }
 
 export default function Clientes({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   const [clientes, setClientes] = useState([])
   const [loading, setLoading]   = useState(true)
   const [modal, setModal]       = useState(false)
@@ -16,7 +16,7 @@ export default function Clientes({ onAddBtn }) {
   const [detalhe, setDetalhe]   = useState(null)
   const [busca, setBusca]       = useState('')
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
+  useEffect(() => { load() }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [clientes])
 
   async function load() {
@@ -27,7 +27,7 @@ export default function Clientes({ onAddBtn }) {
       .select('*')
       .order('nome')
     setClientes(data ?? [])
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

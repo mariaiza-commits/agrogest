@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 
 // ─── TOKENS ──────────────────────────────────────────────────
 const T = {
@@ -55,6 +56,7 @@ function fmt(v) {
 }
 
 export default function DashboardDiario() {
+  const { handleAuthError } = useAuth()
   const [aba, setAba]         = useState('hoje')
   const [kpis, setKpis]       = useState(null)
   const [contasDia, setContas] = useState([])
@@ -62,7 +64,7 @@ export default function DashboardDiario() {
   const [alertas, setAlertas] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [aba])
+  useEffect(() => { load() }, [aba])
 
   async function load() {
     setLoading(true)
@@ -84,7 +86,7 @@ export default function DashboardDiario() {
     setContas(contas ?? [])
     setAgenda(ag ?? [])
     setAlertas(al ?? [])
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

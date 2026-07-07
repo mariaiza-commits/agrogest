@@ -27,7 +27,7 @@ const EMPTY = {
 }
 
 export default function Culturas({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   const [culturas, setCulturas]   = useState([])
   const [lucros, setLucros]       = useState({})
   const [varCad, setVarCad]         = useState([])
@@ -42,7 +42,7 @@ export default function Culturas({ onAddBtn }) {
   const [erro, setErro]           = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
+  useEffect(() => { load() }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [])
 
   async function load() {
@@ -69,7 +69,7 @@ export default function Culturas({ onAddBtn }) {
     Object.entries(varMap).forEach(([k, v]) => { varObj[k] = [...v].sort() })
     setVariedades(varObj)
     setVarCad(vcad ?? [])
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 const EMPTY_ITEM = { lote_id:'', setor_id:'', quantidade_primeira:0, quantidade_segunda:0, peso_medio_primeira:0, peso_medio_segunda:0, preco_kg_primeira:0, preco_kg_segunda:0 }
 
 export default function Producao({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   const [cargas, setCargas]   = useState([])
   const [lotes, setLotes]     = useState([])
   const [setoresMap, setSetoresMap] = useState({}) // lote_id → setores[]
@@ -22,7 +22,7 @@ export default function Producao({ onAddBtn }) {
   const [formObs, setFormObs]   = useState('')
   const [itens, setItens]       = useState([{ ...EMPTY_ITEM }])
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
+  useEffect(() => { load() }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [cargas])
 
   async function load() {
@@ -41,7 +41,7 @@ export default function Producao({ onAddBtn }) {
         m[s.lote_id].push(s)
       })
       setSetoresMap(m)
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

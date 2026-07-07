@@ -165,9 +165,18 @@ export function AuthProvider({ children }) {
     setUser(null); setTenants([]); setTenantId(null)
     setTenantResolved(false)
     setSessionReady(true); setLoading(false)
-    // Chama sem await — com no-op lock não trava.
-    // Cancela timers internos do SDK e limpa o sessionStorage desta aba.
     supabase.auth.signOut().catch(() => {})
+  }
+
+  // Exposto para páginas detectarem erros de JWT nas queries e forçarem logout.
+  function handleAuthError(error) {
+    if (!error) return false
+    const msg = (error.message ?? '').toLowerCase()
+    const isJwt = msg.includes('jwt') || msg.includes('not authenticated') ||
+                  msg.includes('unauthorized') || error.status === 401 ||
+                  error.code === 'PGRST301'
+    if (isJwt) signOut()
+    return isJwt
   }
 
   function selectTenant(id) {
@@ -180,7 +189,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider value={{
       user, tenants, tenantId, tenantResolved,
       loading, sessionReady, sessionVersion, authError,
-      signIn, signOut, selectTenant,
+      signIn, signOut, selectTenant, handleAuthError,
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
 import { fmt, fmtDate } from '../lib/utils'
 import { BtnExportar, exportarPDF } from '../lib/utils'
 
@@ -13,6 +14,7 @@ const RELATORIOS = [
 ]
 
 export default function Relatorios() {
+  const { handleAuthError } = useAuth()
   const [relAtivo, setRelAtivo]   = useState(null)
   const [dados, setDados]         = useState([])
   const [loading, setLoading]     = useState(false)
@@ -183,7 +185,7 @@ export default function Relatorios() {
     }
 
     setDados(rows)
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }

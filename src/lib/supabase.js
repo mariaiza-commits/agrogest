@@ -8,9 +8,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     autoRefreshToken: true,
     detectSessionInUrl: false,
     persistSession: true,
-    // sessionStorage: cada aba tem sessão isolada.
-    // Logout em uma aba não afeta as outras; abas duplicadas herdam a sessão.
-    storage: window.sessionStorage,
+    // localStorage (padrão): abas compartilham o refresh token.
+    // Quando uma aba renova o JWT, as outras recebem o novo token via storage event.
+    // Com sessionStorage, cada aba tinha seu próprio refresh token — quando uma
+    // renovava, o token da outra ficava inválido, causando SIGNED_OUT e tela em branco.
+    storage: window.localStorage,
     lock: async (_name, _timeout, fn) => fn(),
   }
 })

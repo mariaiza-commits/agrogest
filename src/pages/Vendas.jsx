@@ -4,7 +4,7 @@ import { fmt, fmtDate, BtnExportar } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function Vendas({ onAddBtn }) {
-  const { tenantId } = useAuth()
+  const { tenantId, handleAuthError } = useAuth()
   const [vendas, setVendas]     = useState([])
   const [cargas, setCargas]     = useState([])
   const [clientes, setClientes] = useState([])
@@ -29,7 +29,7 @@ export default function Vendas({ onAddBtn }) {
   })
   const [itensVenda, setItensVenda] = useState([])
 
-  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
+  useEffect(() => { load() }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [vendas])
 
   async function load() {
@@ -45,7 +45,7 @@ export default function Vendas({ onAddBtn }) {
       setCargas(cs ?? [])
       setClientes(cls ?? [])
       setContas(cfs ?? [])
-    } catch {} finally {
+    } catch (e) { handleAuthError(e) } finally {
       setLoading(false)
     }
   }
