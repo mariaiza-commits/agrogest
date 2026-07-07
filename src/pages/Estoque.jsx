@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, today, BtnExportar } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -36,18 +36,21 @@ export default function Estoque({ onAddBtn }) {
   const [editMovId, setEditMovId] = useState(null)
   const [saving, setSaving]     = useState(false)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModalIns()) }, [insumos])
 
   async function load() {
     setLoading(true)
+    try {
     const [{ data: ins }, { data: ale }, { data: mv }] = await Promise.all([
       supabase.from('insumos').select('*').order('nome'),
       supabase.from('vw_alertas_estoque').select('*'),
       supabase.from('movimentacoes_estoque').select('*,insumos(nome)').order('data',{ascending:false}).limit(50),
     ])
     setInsumos(ins??[]); setAlertas(ale??[]); setMovs(mv??[])
-    setLoading(false)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   function openModalIns(ins=null) {

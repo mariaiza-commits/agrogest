@@ -20,20 +20,23 @@ export default function Atividades({ onAddBtn }) {
   const [saving, setSaving]     = useState(false)
   const lotesRef = React.useRef([])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [lotes])
 
   async function load() {
     setLoading(true)
-    const [{ data: ls }, { data: sts }, { data: ins }, { data: ats }] = await Promise.all([
-      supabase.from('lotes').select('id,nome').neq('status','inativo').order('nome'),
-      supabase.from('setores').select('*').order('nome'),
-      supabase.from('insumos').select('id,nome,unidade,custo_medio').order('nome'),
-      supabase.from('atividades_lote').select('*,lotes(nome),setores(nome)').order('data',{ascending:false}).limit(50),
-    ])
-    lotesRef.current = ls??[]
-    setLotes(ls??[]); setSetores(sts??[]); setInsumos(ins??[]); setAtividades(ats??[])
-    setLoading(false)
+    try {
+      const [{ data: ls }, { data: sts }, { data: ins }, { data: ats }] = await Promise.all([
+        supabase.from('lotes').select('id,nome').neq('status','inativo').order('nome'),
+        supabase.from('setores').select('*').order('nome'),
+        supabase.from('insumos').select('id,nome,unidade,custo_medio').order('nome'),
+        supabase.from('atividades_lote').select('*,lotes(nome),setores(nome)').order('data',{ascending:false}).limit(50),
+      ])
+      lotesRef.current = ls??[]
+      setLotes(ls??[]); setSetores(sts??[]); setInsumos(ins??[]); setAtividades(ats??[])
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   function setoresDoLote(loteId) { return setores.filter(s=>s.lote_id===loteId) }

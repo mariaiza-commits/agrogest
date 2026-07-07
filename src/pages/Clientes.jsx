@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -16,17 +16,20 @@ export default function Clientes({ onAddBtn }) {
   const [detalhe, setDetalhe]   = useState(null)
   const [busca, setBusca]       = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [clientes])
 
   async function load() {
     setLoading(true)
+    try {
     const { data } = await supabase
       .from('vw_historico_clientes')
       .select('*')
       .order('nome')
     setClientes(data ?? [])
-    setLoading(false)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   function openModal(c = null) {

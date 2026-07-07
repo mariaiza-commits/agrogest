@@ -51,6 +51,7 @@ export default function Relatorios() {
     setRelAtivo(tipo)
     setLoading(true)
     setDados([])
+    try {
 
     let rows = []
 
@@ -182,7 +183,9 @@ export default function Relatorios() {
     }
 
     setDados(rows)
-    setLoading(false)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   const totalValor = dados.reduce((s, r) => {

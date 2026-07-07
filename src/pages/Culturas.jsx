@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -42,11 +42,12 @@ export default function Culturas({ onAddBtn }) {
   const [erro, setErro]           = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [])
 
   async function load() {
     setLoading(true)
+    try {
     const [{ data: cs }, { data: ls }, { data: vs }, { data: vcad }] = await Promise.all([
       supabase.from('culturas').select('*').is('deleted_at', null).order('nome'),
       supabase.from('vw_lucro_por_cultura').select('*'),
@@ -68,7 +69,9 @@ export default function Culturas({ onAddBtn }) {
     Object.entries(varMap).forEach(([k, v]) => { varObj[k] = [...v].sort() })
     setVariedades(varObj)
     setVarCad(vcad ?? [])
-    setLoading(false)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   function openModal(c = null) {

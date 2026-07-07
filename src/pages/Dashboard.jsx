@@ -61,25 +61,38 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const hoje = new Date()
-    const em7d = new Date(hoje.getTime() + 7 * 86400000).toISOString().split('T')[0]
-    const hojeStr = hoje.toISOString().split('T')[0]
-    const mesStr = mesRef.toISOString().split('T')[0]
-    const [{ data: dash }, { data: resumo }, { data: cult }, { data: pagar7d }, { data: emAtraso }, { data: receberPend }] = await Promise.all([
-      supabase.rpc('fn_dashboard_mes', { p_mes: mesStr }),
-      supabase.from('vw_resumo_por_lote').select('*'),
-      supabase.from('vw_resumo_por_cultura').select('*'),
-      supabase.from('vw_contas_a_pagar').select('*').gte('data_vencimento', hojeStr).lte('data_vencimento', em7d),
-      supabase.from('vw_contas_a_pagar').select('*').lt('data_vencimento', hojeStr).order('data_vencimento', { ascending: true }).limit(10),
-      supabase.from('vw_contas_a_receber').select('*').order('data_vencimento', { ascending: true }).limit(5),
-    ])
-    setKpis(Array.isArray(dash) ? dash[0] : dash)
-    setLotes(resumo ?? [])
-    setCulturas(cult ?? [])
-    setVencer(pagar7d ?? [])
-    setAtraso(emAtraso ?? [])
-    setReceber(receberPend ?? [])
-    setLoading(false)
+    try {
+      const hoje = new Date()
+      const em7d = new Date(hoje.getTime() + 7 * 86400000).toISOString().split('T')[0]
+      const hojeStr = hoje.toISOString().split('T')[0]
+      const mesStr = mesRef.toISOString().split('T')[0]
+
+      const withTimeout = (promise, ms) => Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+      ])
+
+      const results = await withTimeout(Promise.all([
+        supabase.rpc('fn_dashboard_mes', { p_mes: mesStr }),
+        supabase.from('vw_resumo_por_lote').select('*'),
+        supabase.from('vw_resumo_por_cultura').select('*'),
+        supabase.from('vw_contas_a_pagar').select('*').gte('data_vencimento', hojeStr).lte('data_vencimento', em7d),
+        supabase.from('vw_contas_a_pagar').select('*').lt('data_vencimento', hojeStr).order('data_vencimento', { ascending: true }).limit(10),
+        supabase.from('vw_contas_a_receber').select('*').order('data_vencimento', { ascending: true }).limit(5),
+      ]), 15000)
+
+      const [{ data: dash }, { data: resumo }, { data: cult }, { data: pagar7d }, { data: emAtraso }, { data: receberPend }] = results
+      setKpis(Array.isArray(dash) ? dash[0] : dash)
+      setLotes(resumo ?? [])
+      setCulturas(cult ?? [])
+      setVencer(pagar7d ?? [])
+      setAtraso(emAtraso ?? [])
+      setReceber(receberPend ?? [])
+    } catch {
+      // Mostra painel vazio em vez de travar infinitamente
+    } finally {
+      setLoading(false)
+    }
   }, [mesRef])
 
   useEffect(() => { load() }, [load])

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -19,18 +19,21 @@ export default function Fornecedores({ onAddBtn }) {
   const [busca, setBusca]               = useState('')
   const [filtroCategoria, setFiltroCategoria] = useState('')
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [])
 
   async function load() {
     setLoading(true)
+    try {
     const [{ data: fs }, { data: hs }] = await Promise.all([
       supabase.from('suppliers').select('*').is('deleted_at', null).order('nome'),
       supabase.from('vw_historico_fornecedores').select('*'),
     ])
     setFornecedores(fs ?? [])
     const h = {}; (hs ?? []).forEach(r => { h[r.supplier_id] = r }); setHistorico(h)
-    setLoading(false)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   function openModal(f = null) {

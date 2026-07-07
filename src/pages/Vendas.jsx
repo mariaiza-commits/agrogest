@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+﻿import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, BtnExportar } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -29,22 +29,25 @@ export default function Vendas({ onAddBtn }) {
   })
   const [itensVenda, setItensVenda] = useState([])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [vendas])
 
   async function load() {
     setLoading(true)
-    const [{ data: vs }, { data: cs }, { data: cls }, { data: cfs }] = await Promise.all([
-      supabase.from('vendas').select('*').is('deleted_at', null).order('data_venda', { ascending: false }).limit(100),
-      supabase.from('vw_resumo_cargas').select('*').order('data', { ascending: false }).limit(50),
-      supabase.from('clients').select('id,nome').is('deleted_at', null).order('nome'),
-      supabase.from('contas_financeiras').select('id,nome').eq('ativo', true).order('nome'),
-    ])
-    setVendas(vs ?? [])
-    setCargas(cs ?? [])
-    setClientes(cls ?? [])
-    setContas(cfs ?? [])
-    setLoading(false)
+    try {
+      const [{ data: vs }, { data: cs }, { data: cls }, { data: cfs }] = await Promise.all([
+        supabase.from('vendas').select('*').is('deleted_at', null).order('data_venda', { ascending: false }).limit(100),
+        supabase.from('vw_resumo_cargas').select('*').order('data', { ascending: false }).limit(50),
+        supabase.from('clients').select('id,nome').is('deleted_at', null).order('nome'),
+        supabase.from('contas_financeiras').select('id,nome').eq('ativo', true).order('nome'),
+      ])
+      setVendas(vs ?? [])
+      setCargas(cs ?? [])
+      setClientes(cls ?? [])
+      setContas(cfs ?? [])
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   async function carregarItens(carga_id) {

@@ -1,7 +1,6 @@
 import React, { useState, useRef, lazy, Suspense } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
-import TenantSelector from './pages/TenantSelector'
 import {
   LayoutDashboard, Map, Leaf, Wheat, Wrench, CalendarDays,
   Package, ShoppingCart, TrendingDown, Landmark, Users, Factory,
@@ -116,22 +115,23 @@ function isTabActive(tab, p) { return tab.page ? p===tab.page : tab.pages?.inclu
 function PageLoader() { return <div style={{textAlign:'center',padding:40,color:'#888'}}>Carregando...</div> }
 
 function PageContent({ currentPage, setPage, sair, addRef }) {
+  const { sessionVersion } = useAuth()
   function reg(fn) { addRef.current = fn }
   return (
     <Suspense fallback={<PageLoader/>}>
-      {currentPage==='Dashboard'    && <Dashboard/>}
-      {currentPage==='Lotes'        && <Lotes       onAddBtn={reg}/>}
-      {currentPage==='Culturas'     && <Culturas     onAddBtn={reg}/>}
-      {currentPage==='Producao'     && <Producao     onAddBtn={reg}/>}
-      {currentPage==='Vendas'       && <Vendas       onAddBtn={reg}/>}
-      {currentPage==='Custos'       && <Custos       onAddBtn={reg}/>}
-      {currentPage==='Financeiro'   && <Financeiro/>}
-      {currentPage==='Estoque'      && <Estoque      onAddBtn={reg}/>}
-      {currentPage==='Atividades'   && <Atividades   onAddBtn={reg}/>}
-      {currentPage==='Programacao'  && <Programacao  onAddBtn={reg}/>}
-      {currentPage==='Clientes'     && <Clientes     onAddBtn={reg}/>}
-      {currentPage==='Fornecedores' && <Fornecedores onAddBtn={reg}/>}
-      {currentPage==='Relatorios'   && <Relatorios/>}
+      {currentPage==='Dashboard'    && <Dashboard      key={sessionVersion}/>}
+      {currentPage==='Lotes'        && <Lotes          key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Culturas'     && <Culturas       key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Producao'     && <Producao       key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Vendas'       && <Vendas         key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Custos'       && <Custos         key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Financeiro'   && <Financeiro     key={sessionVersion}/>}
+      {currentPage==='Estoque'      && <Estoque        key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Atividades'   && <Atividades     key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Programacao'  && <Programacao    key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Clientes'     && <Clientes       key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Fornecedores' && <Fornecedores   key={sessionVersion} onAddBtn={reg}/>}
+      {currentPage==='Relatorios'   && <Relatorios     key={sessionVersion}/>}
     </Suspense>
   )
 }
@@ -446,11 +446,12 @@ function DesktopLayout({ currentPage, setPage, sair }) {
 
 /* ─── APP ROOT ──────────────────────────────────────────────── */
 function AppInner() {
-  const { user, tenantId, loading, signOut } = useAuth()
+  const { user, tenantId, tenantResolved, loading, sessionReady, authError, signOut } = useAuth()
   const [currentPage, setCurrentPage] = useState('Dashboard')
   const isMobile = useIsMobile(768)
 
-  if (loading) return (
+  // Aguarda o JWT ser validado (ou o timeout de 12s disparar)
+  if (loading || (!sessionReady && !authError)) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
       <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
         <Logo size="lg"/>
@@ -459,8 +460,34 @@ function AppInner() {
     </div>
   )
 
+  // Timeout disparou sem conseguir sessão — sem internet ou erro inesperado
+  if (authError && !user) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16, textAlign:'center', padding:24 }}>
+        <Logo size="lg"/>
+        <div style={{ color:'var(--text-muted)', fontSize:14, maxWidth:280, lineHeight:1.5 }}>
+          Não foi possível conectar. Verifique sua internet e tente novamente.
+        </div>
+        <button className="btn btn-primary" onClick={() => window.location.reload()} style={{ marginTop:4 }}>
+          Recarregar
+        </button>
+      </div>
+    </div>
+  )
+
   if (!user) return <Login />
-  if (!tenantId) return <TenantSelector />
+
+  // Após re-login, fetchTenants é async (~500ms). Aguarda completar antes de
+  // renderizar páginas para evitar queries com tenantId=null retornando vazio.
+  // tenantResolved=false apenas entre signOut e o fetch concluir.
+  if (!tenantResolved) return (
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'var(--bg)' }}>
+      <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
+        <Logo size="lg"/>
+        <div style={{ color:'var(--text-muted)', fontSize:13 }}>Carregando...</div>
+      </div>
+    </div>
+  )
 
   return isMobile
     ? <MobileLayout  currentPage={currentPage} setPage={setCurrentPage} sair={signOut}/>

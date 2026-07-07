@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+﻿import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -22,26 +22,28 @@ export default function Producao({ onAddBtn }) {
   const [formObs, setFormObs]   = useState('')
   const [itens, setItens]       = useState([{ ...EMPTY_ITEM }])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [cargas])
 
   async function load() {
     setLoading(true)
-    const [{ data: cs }, { data: ls }, { data: sts }] = await Promise.all([
-      supabase.from('vw_resumo_cargas').select('*').order('data', { ascending: false }),
-      supabase.from('lotes').select('id,nome').order('nome'),
-      supabase.from('setores').select('id,lote_id,nome,cultura,variedade').order('nome'),
-    ])
-    setCargas(cs ?? [])
-    setLotes(ls ?? [])
-    // Agrupa setores por lote
-    const m = {}
-    ;(sts ?? []).forEach(s => {
-      if (!m[s.lote_id]) m[s.lote_id] = []
-      m[s.lote_id].push(s)
-    })
-    setSetoresMap(m)
-    setLoading(false)
+    try {
+      const [{ data: cs }, { data: ls }, { data: sts }] = await Promise.all([
+        supabase.from('vw_resumo_cargas').select('*').order('data', { ascending: false }),
+        supabase.from('lotes').select('id,nome').order('nome'),
+        supabase.from('setores').select('id,lote_id,nome,cultura,variedade').order('nome'),
+      ])
+      setCargas(cs ?? [])
+      setLotes(ls ?? [])
+      const m = {}
+      ;(sts ?? []).forEach(s => {
+        if (!m[s.lote_id]) m[s.lote_id] = []
+        m[s.lote_id].push(s)
+      })
+      setSetoresMap(m)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   function getSetores(lote_id) {

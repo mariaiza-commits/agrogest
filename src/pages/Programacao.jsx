@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react'
+﻿import React, { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmtDate, today } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -21,11 +21,12 @@ export default function Programacao({ onAddBtn }) {
   const [viewMode, setViewMode] = useState('calendario') // calendario | lista
   const lotesRef = React.useRef([])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [lotes])
 
   async function load() {
     setLoading(true)
+    try {
     const [{ data: ls }, { data: sts }, { data: ins }, { data: prg }, { data: ale }] = await Promise.all([
       supabase.from('lotes').select('id,nome').neq('status','inativo').order('nome'),
       supabase.from('setores').select('*').order('nome'),
@@ -36,7 +37,9 @@ export default function Programacao({ onAddBtn }) {
     lotesRef.current = ls??[]
     setLotes(ls??[]); setSetores(sts??[]); setInsumos(ins??[])
     setProgr(prg??[]); setAlertas(ale??[])
-    setLoading(false)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   function setoresDoLote(loteId) { return setores.filter(s=>s.lote_id===loteId) }

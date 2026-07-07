@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 // ─── TOKENS ──────────────────────────────────────────────────
@@ -62,10 +62,11 @@ export default function DashboardDiario() {
   const [alertas, setAlertas] = useState([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [aba])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [aba])
 
   async function load() {
     setLoading(true)
+    try {
     const hoje = new Date()
     let mesStr
     if (aba === 'semana') { const d=new Date(); d.setDate(d.getDate()-3); mesStr=d.toISOString().split('T')[0] }
@@ -83,7 +84,9 @@ export default function DashboardDiario() {
     setContas(contas ?? [])
     setAgenda(ag ?? [])
     setAlertas(al ?? [])
-    setLoading(false)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   const dataHoje = new Date().toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long' })

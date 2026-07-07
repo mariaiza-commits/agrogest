@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react'
+﻿import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { fmt, fmtDate, statusLoteBadge } from '../lib/utils'
 import { useAuth } from '../contexts/AuthContext'
@@ -68,41 +68,44 @@ export default function Lotes({ onAddBtn }) {
   const [varSugestoes, setVarSugestoes] = useState([])
   const [varCadCompleto, setVarCadComp] = useState([]) // { nome, cultura }
 
-  useEffect(() => { loadTudo() }, [])
+  useEffect(() => { loadTudo(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(abrirNovo) }, [lotes])
 
   // ─── CARREGA ───────────────────────────────────────────────
   const loadTudo = useCallback(async (silencioso = false) => {
     if (!silencioso) setLoading(true)
-    const [
-      { data: ls, error: e1 },
-      { data: rs },
-      { data: sts },
-      { data: cs },
-      { data: vs2 },
-    ] = await Promise.all([
-      supabase.from('lotes').select('*').order('nome'),
-      supabase.from('vw_resumo_por_lote').select('*'),
-      supabase.from('setores').select('*, setor_variedades(id, variedade)').order('nome'),
-      supabase.from('culturas').select('id,nome,icone').eq('ativo',true).is('deleted_at',null).order('nome'),
-      supabase.from('variedades_cadastradas').select('nome, cultura').order('cultura').order('nome'),
-    ])
+    try {
+      const [
+        { data: ls, error: e1 },
+        { data: rs },
+        { data: sts },
+        { data: cs },
+        { data: vs2 },
+      ] = await Promise.all([
+        supabase.from('lotes').select('*').order('nome'),
+        supabase.from('vw_resumo_por_lote').select('*'),
+        supabase.from('setores').select('*, setor_variedades(id, variedade)').order('nome'),
+        supabase.from('culturas').select('id,nome,icone').eq('ativo',true).is('deleted_at',null).order('nome'),
+        supabase.from('variedades_cadastradas').select('nome, cultura').order('cultura').order('nome'),
+      ])
 
-    if (e1) { console.error('Erro ao carregar lotes:', e1); setLoading(false); return }
+      if (e1) { console.error('Erro ao carregar lotes:', e1); return }
 
-    setLotes(ls ?? [])
-    const m = {}; (rs ?? []).forEach(r => { m[r.lote_id] = r }); setResumo(m)
-    const s = {}
-    ;(sts ?? []).forEach(st => {
-      if (!s[st.lote_id]) s[st.lote_id] = []
-      s[st.lote_id].push(st)
-    })
-    setSetsMap(s)
-    setCulturas(cs ?? [])
-    const sugs = (vs2 ?? []).map(v => v.nome).filter(Boolean)
-    setVarSugestoes(sugs)
-    setVarCadComp(vs2 ?? [])
-    if (!silencioso) setLoading(false)
+      setLotes(ls ?? [])
+      const m = {}; (rs ?? []).forEach(r => { m[r.lote_id] = r }); setResumo(m)
+      const s = {}
+      ;(sts ?? []).forEach(st => {
+        if (!s[st.lote_id]) s[st.lote_id] = []
+        s[st.lote_id].push(st)
+      })
+      setSetsMap(s)
+      setCulturas(cs ?? [])
+      const sugs = (vs2 ?? []).map(v => v.nome).filter(Boolean)
+      setVarSugestoes(sugs)
+      setVarCadComp(vs2 ?? [])
+    } catch {} finally {
+      if (!silencioso) setLoading(false)
+    }
   }, [])
 
   // ─── ABRE NOVO ─────────────────────────────────────────────

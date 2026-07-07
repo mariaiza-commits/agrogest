@@ -43,12 +43,13 @@ export default function Custos({ onAddBtn }) {
   const [pagData, setPagData]       = useState(today())
   const lotesRef = React.useRef([])
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const _t = setTimeout(() => setLoading(false), 10000); return () => clearTimeout(_t) }, [])
   useEffect(() => { if (onAddBtn) onAddBtn(() => openModal()) }, [lotes])
   useEffect(() => { aplicarFiltros() }, [custos, filtro, dataIni, dataFim, ordem])
 
   async function load() {
     setLoading(true)
+    try {
     const [{ data: ls }, { data: cs }, { data: cats }, { data: cfs }] = await Promise.all([
       supabase.from('lotes').select('id,nome').neq('status','inativo').order('nome'),
       supabase.from('custos').select('*,lotes(nome),categorias(nome)').or('observacoes.is.null,observacoes.neq.ATIVIDADE_AUTOMATICO').order('data_custo',{ascending:false}).limit(200),
@@ -60,7 +61,9 @@ export default function Custos({ onAddBtn }) {
     const forns_res = await supabase.from('suppliers').select('id,nome,categoria').is('deleted_at',null).order('nome')
     setFornecedores(forns_res.data ?? [])
     setSelecionados([])
-    setLoading(false)
+    } catch {} finally {
+      setLoading(false)
+    }
   }
 
   function aplicarFiltros() {

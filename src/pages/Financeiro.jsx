@@ -153,7 +153,7 @@ export default function Financeiro() {
     setLoad(false)
   },[])
 
-  useEffect(()=>{ load() },[load])
+  useEffect(()=>{ load(); const _t = setTimeout(() => setLoad(false), 10000); return () => clearTimeout(_t) },[load])
 
   const [modalAjuste, setModalAjuste] = useState(null) // conta a ajustar
   const [ajusteValor, setAjusteValor] = useState('')
