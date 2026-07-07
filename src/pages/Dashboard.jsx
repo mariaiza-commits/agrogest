@@ -40,6 +40,44 @@ function Alert({ type, text }) {
   )
 }
 
+// ─── SKELETON ────────────────────────────────────────────────
+const skStyle = {
+  background: 'linear-gradient(90deg, var(--gray-100) 25%, var(--gray-50) 50%, var(--gray-100) 75%)',
+  backgroundSize: '200% 100%',
+  animation: 'ag-shimmer 1.4s infinite',
+  borderRadius: 6,
+}
+function Sk({ w = '100%', h = 16, style }) {
+  return <div style={{ width: w, height: h, ...skStyle, ...style }} />
+}
+function DashboardSkeleton() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <style>{`@keyframes ag-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }`}</style>
+      {/* KPI grid */}
+      <div className="kpi-grid">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="kpi-card" style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            <Sk w="50%" h={10} />
+            <Sk w="70%" h={28} />
+            <Sk w="40%" h={10} />
+          </div>
+        ))}
+      </div>
+      {/* Lotes table placeholder */}
+      <div className="card" style={{ padding:20, display:'flex', flexDirection:'column', gap:12 }}>
+        <Sk w="30%" h={14} />
+        {[...Array(3)].map((_, i) => <Sk key={i} h={36} />)}
+      </div>
+      {/* Chart placeholder */}
+      <div className="card" style={{ padding:20, display:'flex', flexDirection:'column', gap:12 }}>
+        <Sk w="40%" h={14} />
+        <Sk h={140} style={{ borderRadius:8 }} />
+      </div>
+    </div>
+  )
+}
+
 // ─── MAIN ────────────────────────────────────────────────────
 export default function Dashboard() {
   const [kpis, setKpis]       = useState(null)
@@ -131,7 +169,7 @@ export default function Dashboard() {
     return `No período, foram vendidas ${caixas.toLocaleString('pt-BR')} caixas em ${nLotes} lote(s), gerando ${fmt(receita)}. ${cultDesc} ${custoDesc}`
   }, [kpis, lotes, culturas])
 
-  if (loading) return <div className="loading">Carregando painel...</div>
+  if (loading) return <DashboardSkeleton />
 
   const temAlertasFinanceiros = atraso.length > 0 || vencer.length > 0 || receber.length > 0
 

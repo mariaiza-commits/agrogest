@@ -1,7 +1,4 @@
 import React from 'react'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
-import * as XLSX from 'xlsx'
 
 export const fmt = (value) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value ?? 0)
@@ -48,8 +45,10 @@ export const categLabel = (cat) => {
 }
 
 // ─── EXPORTAÇÃO EXCEL ────────────────────────────────────────
-export function exportarExcel(dados, colunas, nomeArquivo) {
+export async function exportarExcel(dados, colunas, nomeArquivo) {
   if (!dados?.length) return
+
+  const XLSX = await import('xlsx')
 
   let rows, headers
   if (colunas) {
@@ -61,7 +60,6 @@ export function exportarExcel(dados, colunas, nomeArquivo) {
     XLSX.utils.book_append_sheet(wb, ws, 'Dados')
     XLSX.writeFile(wb, `${nomeArquivo}_${today()}.xlsx`)
   } else {
-    // dados já é array de objetos com chaves como header
     const ws = XLSX.utils.json_to_sheet(dados)
     const keys = Object.keys(dados[0] ?? {})
     ws['!cols'] = keys.map(k => ({ wch: Math.max(k.length + 2, 14) }))
@@ -72,8 +70,11 @@ export function exportarExcel(dados, colunas, nomeArquivo) {
 }
 
 // ─── EXPORTAÇÃO PDF ─────────────────────────────────────────
-export function exportarPDF(dados, colunas, titulo, nomeArquivo) {
+export async function exportarPDF(dados, colunas, titulo, nomeArquivo) {
   if (!dados?.length) return
+
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
 
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
 
@@ -114,17 +115,30 @@ export function exportarPDF(dados, colunas, titulo, nomeArquivo) {
 // ─── BOTÃO EXPORTAR (Excel + PDF) ───────────────────────────
 export function BtnExportar({ dados, colunas, nome, titulo }) {
   const [open, setOpen] = React.useState(false)
+  const [loading, setLoading] = React.useState(false)
 
   if (!dados?.length) return null
+
+  async function handleExcel() {
+    setOpen(false); setLoading(true)
+    await exportarExcel(dados, colunas, nome)
+    setLoading(false)
+  }
+
+  async function handlePDF() {
+    setOpen(false); setLoading(true)
+    await exportarPDF(dados, colunas, titulo || nome, nome)
+    setLoading(false)
+  }
 
   return (
     <div style={{ position: 'relative', display: 'inline-block' }}>
       <button
         className="btn btn-sm"
-        onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+        onClick={() => !loading && setOpen(o => !o)}
+        style={{ display: 'flex', alignItems: 'center', gap: 5, opacity: loading ? 0.6 : 1 }}
       >
-        ↓ Exportar
+        {loading ? 'Gerando...' : '↓ Exportar'}
       </button>
       {open && (
         <>
@@ -135,14 +149,14 @@ export function BtnExportar({ dados, colunas, nome, titulo }) {
             borderRadius: 8, boxShadow: 'var(--shadow)', zIndex: 100,
             minWidth: 140, overflow: 'hidden',
           }}>
-            <button onClick={() => { exportarExcel(dados, colunas, nome); setOpen(false) }}
+            <button onClick={handleExcel}
               style={{ width: '100%', padding: '9px 14px', border: 'none', background: 'none',
                 cursor: 'pointer', textAlign: 'left', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--gray-50)'}
               onMouseLeave={e => e.currentTarget.style.background = 'none'}>
               📊 Excel (.xlsx)
             </button>
-            <button onClick={() => { exportarPDF(dados, colunas, titulo || nome, nome); setOpen(false) }}
+            <button onClick={handlePDF}
               style={{ width: '100%', padding: '9px 14px', border: 'none', background: 'none',
                 cursor: 'pointer', textAlign: 'left', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--gray-50)'}
