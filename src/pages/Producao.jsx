@@ -124,17 +124,21 @@ export default function Producao({ onAddBtn }) {
         preco_kg_primeira: Number(it.preco_kg_primeira) || 0,
         preco_kg_segunda: Number(it.preco_kg_segunda) || 0,
       }))
-      const { error } = await supabase.rpc('fn_salvar_carga', {
+      const rpcCall = supabase.rpc('fn_salvar_carga', {
         p_carga_id: editId || null,
         p_data: formData,
         p_obs: formObs || null,
         p_itens: itensPayload,
         p_tenant_id: tenantId,
       })
+      const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Tempo esgotado. Verifique a conexão e tente novamente.')), 30000)
+      )
+      const { error } = await Promise.race([rpcCall, timeout])
       if (error) throw new Error(error.message)
       setModal(false)
       await load()
-    } catch(err) { alert('Erro: ' + err.message) }
+    } catch(err) { handleAuthError(err) || alert('Erro: ' + err.message) }
     finally { setSaving(false) }
   }
 
