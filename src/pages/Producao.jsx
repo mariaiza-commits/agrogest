@@ -138,7 +138,12 @@ export default function Producao({ onAddBtn }) {
       if (error) throw new Error(error.message)
       setModal(false)
       await load()
-    } catch(err) { handleAuthError(err) || alert('Erro: ' + err.message) }
+    } catch(err) {
+      console.error('[Producao.save] erro:', err)
+      if (!handleAuthError(err)) {
+        alert('Erro ao salvar: ' + (err.message || JSON.stringify(err)))
+      }
+    }
     finally { setSaving(false) }
   }
 
