@@ -183,16 +183,25 @@ export default function Financeiro() {
     if (!tOrigem || !tDestino || !tValor || parseFloat(tValor) <= 0) return alert('Preencha todos os campos com valores válidos.')
     if (tOrigem === tDestino) return alert('Conta de origem e destino não podem ser iguais.')
     setTransf(true)
-    const { error } = await supabase.rpc('fn_transferir', {
-      p_origem_id: tOrigem,
-      p_destino_id: tDestino,
-      p_valor: parseFloat(tValor),
-      p_data: tData,
-      p_descricao: tDesc || 'Transferência',
-      p_tenant_id: tenantId,
-    })
-    if (error) { alert('Erro: ' + error.message); setTransf(false); return }
-    setTransf(false); setTValor(''); load()
+    try {
+      const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error('Tempo esgotado.')),30000))
+      const { error } = await Promise.race([
+        supabase.rpc('fn_transferir', {
+          p_origem_id: tOrigem,
+          p_destino_id: tDestino,
+          p_valor: parseFloat(tValor),
+          p_data: tData,
+          p_descricao: tDesc || 'Transferência',
+          p_tenant_id: tenantId,
+        }),
+        timeout
+      ])
+      if (error) throw new Error(error.message)
+      setTValor(''); load()
+    } catch(err) {
+      console.error('[Financeiro.transferir]', err)
+      alert('Erro ao transferir: ' + err.message)
+    } finally { setTransf(false) }
   }
 
   async function salvarConta() {

@@ -85,26 +85,35 @@ export default function Atividades({ onAddBtn }) {
       }
     }
     setSaving(true)
-    const payload = { lote_id:form.lote_id, setor_id:form.setor_id||null, data:form.data, tipo_atividade:form.tipo_atividade, observacoes:form.observacoes||null, status:'realizada' }
-    let atvId = editId
-    if (editId) {
-      await supabase.from('atividades_lote').update(payload).eq('id',editId)
-    } else {
-      const { data } = await supabase.from('atividades_lote').insert({ ...payload, tenant_id: tenantId }).select().single()
-      atvId = data?.id
-    }
-    // Salva insumos usados (apenas no insert)
-    if (!editId && atvId) {
-      const linhasValidas = linhasInsumos.filter(l=>l.insumo_id&&parseFloat(l.quantidade)>0)
-      for (const l of linhasValidas) {
-        await supabase.from('atividade_insumos').insert({
-          atividade_id:atvId, insumo_id:l.insumo_id,
-          quantidade:parseFloat(l.quantidade), custo_unitario:parseFloat(l.custo_unitario)||0,
-          tenant_id: tenantId,
-        })
+    try {
+      const payload = { lote_id:form.lote_id, setor_id:form.setor_id||null, data:form.data, tipo_atividade:form.tipo_atividade, observacoes:form.observacoes||null, status:'realizada' }
+      let atvId = editId
+      const timeout = () => new Promise((_,reject)=>setTimeout(()=>reject(new Error('Tempo esgotado.')),30000))
+      if (editId) {
+        const res = await Promise.race([supabase.from('atividades_lote').update(payload).eq('id',editId), timeout()])
+        if (res?.error) throw new Error(res.error.message)
+      } else {
+        const res = await Promise.race([supabase.from('atividades_lote').insert({ ...payload, tenant_id: tenantId }).select().single(), timeout()])
+        if (res?.error) throw new Error(res.error.message)
+        atvId = res?.data?.id
       }
-    }
-    setSaving(false); closeModal(); load()
+      // Salva insumos usados (apenas no insert)
+      if (!editId && atvId) {
+        const linhasValidas = linhasInsumos.filter(l=>l.insumo_id&&parseFloat(l.quantidade)>0)
+        for (const l of linhasValidas) {
+          const res = await Promise.race([supabase.from('atividade_insumos').insert({
+            atividade_id:atvId, insumo_id:l.insumo_id,
+            quantidade:parseFloat(l.quantidade), custo_unitario:parseFloat(l.custo_unitario)||0,
+            tenant_id: tenantId,
+          }), timeout()])
+          if (res?.error) throw new Error(res.error.message)
+        }
+      }
+      closeModal(); load()
+    } catch(err) {
+      console.error('[Atividades.save]', err)
+      alert('Erro ao salvar: ' + err.message)
+    } finally { setSaving(false) }
   }
 
   async function excluir(id) {

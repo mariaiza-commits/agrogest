@@ -205,15 +205,19 @@ export default function Lotes({ onAddBtn }) {
         area_hectares: parseFloat(s.area_hectares) || null,
         data_plantio: s.data_plantio || null,
       }))
-      const { error } = await supabase.rpc('fn_salvar_lote_completo', {
-        p_lote_id: editLote ? editLote.id : null,
-        p_nome: fNome.trim(),
-        p_area_ha: parseFloat(fArea) || null,
-        p_status: fStatus,
-        p_observacoes: fObs || null,
-        p_setores: setoresPayload,
-        p_tenant_id: tenantId,
-      })
+      const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error('Tempo esgotado.')),30000))
+      const { error } = await Promise.race([
+        supabase.rpc('fn_salvar_lote_completo', {
+          p_lote_id: editLote ? editLote.id : null,
+          p_nome: fNome.trim(),
+          p_area_ha: parseFloat(fArea) || null,
+          p_status: fStatus,
+          p_observacoes: fObs || null,
+          p_setores: setoresPayload,
+          p_tenant_id: tenantId,
+        }),
+        timeout
+      ])
       if (error) throw new Error(error.message)
       setEditAberto(false)
       await loadTudo(true)

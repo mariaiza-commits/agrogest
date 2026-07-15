@@ -252,6 +252,8 @@ export default function Custos({ onAddBtn }) {
 
       const base={lote_id:form.lote_id||null,data:form.data,data_custo:form.data,categoria_id:form.categoria_id||null,categoria:catNome,descricao:form.descricao||catNome,fornecedor:fornFinal,observacoes:form.observacoes||null}
 
+      const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error('Tempo esgotado.')),30000))
+
       let res
 
       if (editId){
@@ -260,11 +262,11 @@ export default function Custos({ onAddBtn }) {
 
       } else if (form.tipo_parcelamento==='parcelado'&&parseInt(form.num_parcelas)>1){
 
-        res = await supabase.rpc('fn_gerar_parcelas_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor_total:parseFloat(form.valor),p_num_parcelas:parseInt(form.num_parcelas),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId})
+        res = await Promise.race([supabase.rpc('fn_gerar_parcelas_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor_total:parseFloat(form.valor),p_num_parcelas:parseInt(form.num_parcelas),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId}),timeout])
 
       } else if (form.tipo_parcelamento==='mensal'&&parseInt(form.num_meses)>1){
 
-        res = await supabase.rpc('fn_gerar_mensal_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor:parseFloat(form.valor),p_num_meses:parseInt(form.num_meses),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId})
+        res = await Promise.race([supabase.rpc('fn_gerar_mensal_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor:parseFloat(form.valor),p_num_meses:parseInt(form.num_meses),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId}),timeout])
 
       } else {
 
