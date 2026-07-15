@@ -102,16 +102,21 @@ export default function Custos({ onAddBtn }) {
 
     try {
 
-    const [{ data: ls }, { data: cs }, { data: cats }, { data: cfs }] = await Promise.all([
+    const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error('Tempo esgotado ao carregar custos.')),20000))
 
-      supabase.from('lotes').select('id,nome').neq('status','inativo').order('nome'),
+    const [{ data: ls }, { data: cs }, { data: cats }, { data: cfs }] = await Promise.race([
+      Promise.all([
 
-      supabase.from('custos').select('*,lotes(nome),categorias(nome)').or('observacoes.is.null,observacoes.neq.ATIVIDADE_AUTOMATICO').order('data_custo',{ascending:false}).limit(200),
+        supabase.from('lotes').select('id,nome').neq('status','inativo').order('nome'),
 
-      supabase.from('categorias').select('*').eq('tipo','custo').order('nome'),
+        supabase.from('custos').select('*,lotes(nome),categorias(nome)').or('observacoes.is.null,observacoes.neq.ATIVIDADE_AUTOMATICO').order('data_custo',{ascending:false}).limit(200),
 
-      supabase.from('contas_financeiras').select('id,nome,tipo,saldo_atual').eq('ativo',true).order('nome'),
+        supabase.from('categorias').select('*').eq('tipo','custo').order('nome'),
 
+        supabase.from('contas_financeiras').select('id,nome,tipo,saldo_atual').eq('ativo',true).order('nome'),
+
+      ]),
+      timeout
     ])
 
     lotesRef.current = ls??[]
@@ -124,7 +129,10 @@ export default function Custos({ onAddBtn }) {
 
     setSelecionados([])
 
-    } catch (e) { handleAuthError(e) } finally {
+    } catch (e) {
+      console.error('[Custos.load]', e)
+      if (!handleAuthError(e)) alert('Erro ao carregar: ' + (e.message || JSON.stringify(e)))
+    } finally {
 
       setLoading(false)
 
