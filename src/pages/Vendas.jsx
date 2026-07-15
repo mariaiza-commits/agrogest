@@ -136,7 +136,7 @@ export default function Vendas({ onAddBtn }) {
     setSaving(true)
     try {
       const status = form.condicao === 'avista' ? 'recebido' : 'pendente'
-      const { error } = await supabase.rpc('fn_salvar_venda', {
+      const rpcCall = supabase.rpc('fn_salvar_venda', {
         p_venda_id:        editId || null,
         p_carga_id:        form.carga_id,
         p_client_id:       form.client_id || null,
@@ -158,10 +158,15 @@ export default function Vendas({ onAddBtn }) {
           preco_kg1: it.preco_kg1, preco_kg2: it.preco_kg2,
         })),
       })
+      const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error('Tempo esgotado. Verifique a conexão e tente novamente.')),30000))
+      const { error } = await Promise.race([rpcCall, timeout])
       if (error) throw new Error(error.message)
       setModal(false)
       await load()
-    } catch(err) { alert('Erro: ' + err.message) }
+    } catch(err) {
+      console.error('[Vendas.save]', err)
+      alert('Erro ao salvar: ' + err.message)
+    }
     finally { setSaving(false) }
   }
 
