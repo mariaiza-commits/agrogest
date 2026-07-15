@@ -348,8 +348,8 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* RESUMO POR CULTURA */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+          {/* RESUMO POR CULTURA - removido a pedido */}
+          {false && <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
             <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontWeight: 700, fontSize: 15 }}>🌿 Resumo por cultura</span>
             </div>
@@ -406,7 +406,7 @@ export default function Dashboard() {
                     )
                   })}
             </div>
-          </div>
+          </div>}
 
         </div>
       </div>
