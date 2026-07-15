@@ -118,18 +118,28 @@ export default function Custos({ onAddBtn }) {
     if (!form.categoria_id) return alert('Selecione a categoria.')
     if (!fornFinal) return alert('Informe o fornecedor.')
     setSaving(true)
-    const catNome=categorias.find(c=>c.id===form.categoria_id)?.nome??''
-    const base={lote_id:form.lote_id||null,data:form.data,data_custo:form.data,categoria_id:form.categoria_id||null,categoria:catNome,descricao:form.descricao||catNome,fornecedor:fornFinal,observacoes:form.observacoes||null}
-    if (editId){
-      await supabase.from('custos').update({...base,valor:parseFloat(form.valor),status_pagamento:form.status_pagamento,data_vencimento:form.data_vencimento||null}).eq('id',editId)
-    } else if (form.tipo_parcelamento==='parcelado'&&parseInt(form.num_parcelas)>1){
-      await supabase.rpc('fn_gerar_parcelas_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor_total:parseFloat(form.valor),p_num_parcelas:parseInt(form.num_parcelas),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId})
-    } else if (form.tipo_parcelamento==='mensal'&&parseInt(form.num_meses)>1){
-      await supabase.rpc('fn_gerar_mensal_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor:parseFloat(form.valor),p_num_meses:parseInt(form.num_meses),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId})
-    } else {
-      await supabase.from('custos').insert({...base,valor:parseFloat(form.valor),status_pagamento:form.status_pagamento,data_vencimento:form.data_vencimento||null,tipo_parcelamento:'avista',tenant_id:tenantId})
+    try {
+      const catNome=categorias.find(c=>c.id===form.categoria_id)?.nome??''
+      const base={lote_id:form.lote_id||null,data:form.data,data_custo:form.data,categoria_id:form.categoria_id||null,categoria:catNome,descricao:form.descricao||catNome,fornecedor:fornFinal,observacoes:form.observacoes||null}
+      let res
+      if (editId){
+        res = await supabase.from('custos').update({...base,valor:parseFloat(form.valor),status_pagamento:form.status_pagamento,data_vencimento:form.data_vencimento||null}).eq('id',editId)
+      } else if (form.tipo_parcelamento==='parcelado'&&parseInt(form.num_parcelas)>1){
+        res = await supabase.rpc('fn_gerar_parcelas_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor_total:parseFloat(form.valor),p_num_parcelas:parseInt(form.num_parcelas),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId})
+      } else if (form.tipo_parcelamento==='mensal'&&parseInt(form.num_meses)>1){
+        res = await supabase.rpc('fn_gerar_mensal_custo',{p_lote_id:form.lote_id||null,p_data_competencia:form.data,p_categoria:catNome,p_descricao:form.descricao||catNome,p_fornecedor:fornFinal,p_valor:parseFloat(form.valor),p_num_meses:parseInt(form.num_meses),p_primeiro_venc:form.data_vencimento,p_observacoes:form.observacoes||null,p_tenant_id:tenantId})
+      } else {
+        res = await supabase.from('custos').insert({...base,valor:parseFloat(form.valor),status_pagamento:form.status_pagamento,data_vencimento:form.data_vencimento||null,tipo_parcelamento:'avista',tenant_id:tenantId})
+      }
+      if (res?.error) throw res.error
+      closeModal()
+      load()
+    } catch(e) {
+      console.error('[Custos.save] erro:', e)
+      if (!handleAuthError(e)) alert('Erro ao salvar: ' + (e.message || JSON.stringify(e)))
+    } finally {
+      setSaving(false)
     }
-    setSaving(false);closeModal();load()
   }
 
   function abrirPagar(custo) { setModalPagar(custo); setPagContaId(contas[0]?.id??''); setPagData(today()) }

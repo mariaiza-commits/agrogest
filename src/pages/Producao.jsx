@@ -84,7 +84,8 @@ export default function Producao({ onAddBtn }) {
       setEditId(carga.carga_id)
       setFormData(carga.data)
       setFormObs(carga.observacoes ?? '')
-      const { data: its } = await supabase.from('carga_itens').select('*').eq('carga_id', carga.carga_id)
+      const { data: its, error: itsErr } = await supabase.from('carga_itens').select('*').eq('carga_id', carga.carga_id)
+      if (itsErr) { console.error('[Producao.openModal] erro ao buscar itens:', itsErr); handleAuthError(itsErr) }
       if (its?.length) setItens(its.map(it => ({
         id: it.id,
         lote_id: it.lote_id ?? '',
