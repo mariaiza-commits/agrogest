@@ -13,6 +13,5 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     // Com sessionStorage, cada aba tinha seu próprio refresh token — quando uma
     // renovava, o token da outra ficava inválido, causando SIGNED_OUT e tela em branco.
     storage: window.localStorage,
-    lock: async (_name, _timeout, fn) => fn(),
   }
 })
