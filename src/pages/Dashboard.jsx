@@ -107,28 +107,51 @@ export default function Dashboard() {
       const hojeStr = hoje.toISOString().split('T')[0]
       const mesStr = mesRef.toISOString().split('T')[0]
 
-      const withTimeout = (promise, ms) => Promise.race([
+      const withTimeout = (promise, ms, label) => Promise.race([
         promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`timeout:${label}`)), ms))
       ])
 
-      const results = await withTimeout(Promise.all([
+      // fn_dashboard_mes separado para não bloquear os outros
+      const dashResult = await withTimeout(
         supabase.rpc('fn_dashboard_mes', { p_mes: mesStr }),
-        supabase.from('vw_resumo_por_lote').select('*'),
-        supabase.from('vw_resumo_por_cultura').select('*'),
-        supabase.from('vw_contas_a_pagar').select('*').gte('data_vencimento', hojeStr).lte('data_vencimento', em7d),
-        supabase.from('vw_contas_a_pagar').select('*').lt('data_vencimento', hojeStr).order('data_vencimento', { ascending: true }).limit(10),
-        supabase.from('vw_contas_a_receber').select('*').order('data_vencimento', { ascending: true }).limit(5),
-      ]), 15000)
+        25000, 'fn_dashboard_mes'
+      )
+      if (dashResult.error) {
+        console.error('[Dashboard] fn_dashboard_mes error:', dashResult.error)
+        if (handleAuthError(dashResult.error)) return
+      } else {
+        const d = dashResult.data
+        setKpis(Array.isArray(d) ? d[0] : d)
+      }
 
-      const [{ data: dash }, { data: resumo }, { data: cult }, { data: pagar7d }, { data: emAtraso }, { data: receberPend }] = results
-      setKpis(Array.isArray(dash) ? dash[0] : dash)
-      setLotes(resumo ?? [])
-      setCulturas(cult ?? [])
-      setVencer(pagar7d ?? [])
-      setAtraso(emAtraso ?? [])
-      setReceber(receberPend ?? [])
+      // Demais queries em paralelo, falhas individuais não bloqueiam
+      const [resumoR, cultR, pagar7dR, emAtrasoR, receberR] = await withTimeout(
+        Promise.allSettled([
+          supabase.from('vw_resumo_por_lote').select('*'),
+          supabase.from('vw_resumo_por_cultura').select('*'),
+          supabase.from('vw_contas_a_pagar').select('*').gte('data_vencimento', hojeStr).lte('data_vencimento', em7d),
+          supabase.from('vw_contas_a_pagar').select('*').lt('data_vencimento', hojeStr).order('data_vencimento', { ascending: true }).limit(10),
+          supabase.from('vw_contas_a_receber').select('*').order('data_vencimento', { ascending: true }).limit(5),
+        ]),
+        25000, 'views'
+      )
+
+      const ok = r => r.status === 'fulfilled' ? r.value.data : null
+      const err = (r, name) => { if (r.status === 'rejected' || r.value?.error) console.error(`[Dashboard] ${name}:`, r.status === 'rejected' ? r.reason : r.value.error) }
+      err(resumoR, 'vw_resumo_por_lote')
+      err(cultR, 'vw_resumo_por_cultura')
+      err(pagar7dR, 'vw_contas_a_pagar (7d)')
+      err(emAtrasoR, 'vw_contas_a_pagar (atraso)')
+      err(receberR, 'vw_contas_a_receber')
+
+      setLotes(ok(resumoR) ?? [])
+      setCulturas(ok(cultR) ?? [])
+      setVencer(ok(pagar7dR) ?? [])
+      setAtraso(ok(emAtrasoR) ?? [])
+      setReceber(ok(receberR) ?? [])
     } catch (e) {
+      console.error('[Dashboard] load error:', e.message)
       handleAuthError(e)
     } finally {
       setLoading(false)
