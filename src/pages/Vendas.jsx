@@ -16,6 +16,7 @@ export default function Vendas({ onAddBtn }) {
   const [detalhe, setDetalhe]   = useState(null)
   const [modalReceber, setModalReceber] = useState(null)
   const [contaReceber, setContaReceber] = useState('')
+  const [recebData, setRecebData]       = useState('')
   const [salvandoRec, setSalvandoRec]   = useState(false)
 
   const [form, setForm] = useState({
@@ -172,12 +173,14 @@ export default function Vendas({ onAddBtn }) {
 
   async function receberVenda() {
     if (!contaReceber) return alert('Selecione a conta.')
+    if (!recebData) return alert('Informe a data do recebimento.')
     setSalvandoRec(true)
     await supabase.from('vendas').update({
       status_pagamento: 'recebido',
       conta_financeira_id: contaReceber,
+      data_recebimento: recebData,
     }).eq('id', modalReceber.id)
-    setSalvandoRec(false); setModalReceber(null); setContaReceber(''); load()
+    setSalvandoRec(false); setModalReceber(null); setContaReceber(''); setRecebData(''); load()
   }
 
   async function desfazerRecebimento(id) {
@@ -275,7 +278,8 @@ export default function Vendas({ onAddBtn }) {
                         <div style={{display:'flex', gap:4}}>
                           {(v.status_pagamento==='pendente'||v.status_pagamento==='atrasado') && (
                             <button className="btn btn-sm" style={{background:'var(--green-light)',color:'var(--green)',whiteSpace:'nowrap'}}
-                              onClick={()=>{setModalReceber(v);setContaReceber('')}}>
+                              onClick={()=>{setModalReceber(v);setContaReceber('');setRecebData(new Date().toISOString().split('T')[0])}}>
+
                               💰 Receber
                             </button>
                           )}
@@ -347,6 +351,10 @@ export default function Vendas({ onAddBtn }) {
                 <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:4}}>Venda de {fmtDate(modalReceber.data_venda)}</div>
                 <div style={{fontSize:18,fontWeight:700,color:'var(--green)'}}>{fmt(modalReceber.valor_liquido)}</div>
                 <div style={{fontSize:12,color:'var(--text-muted)',marginTop:2}}>{modalReceber.comprador}</div>
+              </div>
+              <div className="form-group">
+                <label>Data do recebimento *</label>
+                <input type="date" value={recebData} onChange={e=>setRecebData(e.target.value)} />
               </div>
               <div className="form-group">
                 <label>Conta que receberá o valor *</label>
