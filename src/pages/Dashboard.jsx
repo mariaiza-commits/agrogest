@@ -189,9 +189,9 @@ export default function Dashboard() {
   const resumoExec = useMemo(() => {
     if (!receita) return 'Nenhuma venda registrada no período.'
     const nLotes = lotes.filter(l => Number(l.receita_bruta) > 0).length
-    const cultDesc = cultComReceita.length === 1 ? `A cultura ${cultComReceita[0]?.cultura} representa 100% da receita.` : `${cultComReceita.length} culturas geraram receita no período.`
+    const cultDesc = cultComReceita.length === 1 ? `A cultura ${cultComReceita[0]?.cultura} representa 100% da receita.` : cultComReceita.length > 1 ? `${cultComReceita.length} culturas geraram receita no período.` : ''
     const custoDesc = custo === 0 ? 'Não há custos lançados.' : `Custos lançados: ${fmt(custo)}.`
-    return `No período, foram vendidas ${caixas.toLocaleString('pt-BR')} caixas em ${nLotes} lote(s), gerando ${fmt(receita)}. ${cultDesc} ${custoDesc}`
+    return `No período, foram vendidas ${caixas.toLocaleString('pt-BR')} caixas em ${nLotes} lote(s), gerando ${fmt(receita)}. ${cultDesc} ${custoDesc}`.trim()
   }, [kpis, lotes, culturas])
 
   if (loading) return <DashboardSkeleton />
