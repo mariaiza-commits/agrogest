@@ -12,6 +12,11 @@ function pickTenant(list, saved) {
   return found ? found.tenant_id : list[0].tenant_id
 }
 
+function jwtExpired(session) {
+  if (!session?.expires_at) return true
+  return Date.now() / 1000 > session.expires_at - 10
+}
+
 function readCache() {
   try {
     const raw = localStorage.getItem(TENANTS_KEY)
@@ -45,13 +50,14 @@ async function fetchTenants(userId) {
 export function AuthProvider({ children }) {
   const cache = readCache()
 
-  const [user,           setUser]           = useState(cache?.user     ?? null)
-  const [tenants,        setTenants]        = useState(cache?.tenants  ?? [])
-  const [tenantId,       setTenantId]       = useState(cache?.tenantId ?? null)
-  const [loading,        setLoading]        = useState(!cache)
-  const [sessionReady,   setSessionReady]   = useState(false)
+  const [user,           setUser]          = useState(cache?.user     ?? null)
+  const [tenants,        setTenants]       = useState(cache?.tenants  ?? [])
+  const [tenantId,       setTenantId]      = useState(cache?.tenantId ?? null)
+  const [loading,        setLoading]       = useState(!cache)
+  const [sessionReady,   setSessionReady]  = useState(false)
   const [sessionVersion, setSessionVersion] = useState(0)
-  const [authError,      setAuthError]      = useState(false)
+  const [authError,      setAuthError]     = useState(false)
+  // true após fetchTenants completar no SIGNED_IN (ou quando há cache).
   const [tenantResolved, setTenantResolved] = useState(!!cache)
 
   const readyRef = useRef(false)
@@ -66,26 +72,8 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let cancelled = false
 
-    // CRITICO: nao chamar o Supabase dentro do callback do onAuthStateChange.
-    // O callback roda com o lock de auth segurado; qualquer supabase.from() ou
-    // getSession() la dentro trava (auth-js#762). O setTimeout(...,0) joga a
-    // chamada pra depois do callback terminar, com o lock ja liberado.
-    function resolveTenants(sessionUser) {
-      setTimeout(async () => {
-        if (cancelled) return
-        const list = await fetchTenants(sessionUser.id)
-        if (cancelled) return
-        const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
-        setTenants(list)
-        setTenantId(tid ?? null)
-        if (tid) localStorage.setItem('ag_tenant_id', tid)
-        saveCache(sessionUser, list, tid)
-        setTenantResolved(true)
-      }, 0)
-    }
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         if (cancelled) return
 
         if (event === 'INITIAL_SESSION') {
@@ -94,29 +82,57 @@ export function AuthProvider({ children }) {
             setUser(null); setTenants([]); setTenantId(null)
             setTenantResolved(false)
             markReady()
-          } else {
-            // Antes: token expirado caia num ramo que nao chamava markReady()
-            // e a UI ficava presa em "Carregando...". Agora todo caso com
-            // usuario segue o mesmo caminho — o SDK renova o token sozinho
-            // quando resolveTenants rodar (fora do lock). Se falhar, vem SIGNED_OUT.
+
+          } else if (!jwtExpired(session)) {
             setUser(session.user)
-            resolveTenants(session.user)
+            const currentCache = readCache()
+            if (!currentCache || currentCache.user?.id !== session.user.id) {
+              const list = await fetchTenants(session.user.id)
+              if (cancelled) return
+              const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+              setTenants(list); setTenantId(tid ?? null)
+              if (tid) localStorage.setItem('ag_tenant_id', tid)
+              saveCache(session.user, list, tid)
+            } else {
+              fetchTenants(session.user.id).then(list => {
+                if (cancelled || !list.length) return
+                const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+                setTenants(list)
+                if (tid) { setTenantId(tid); localStorage.setItem('ag_tenant_id', tid) }
+                saveCache(session.user, list, tid)
+              })
+            }
+            setTenantResolved(true)
             markReady()
           }
+          // Token expirado: aguarda TOKEN_REFRESHED ou SIGNED_OUT
 
         } else if (event === 'TOKEN_REFRESHED') {
           if (session?.user) {
             setUser(session.user)
-            resolveTenants(session.user)
-          } else {
-            setTenantResolved(true)
+            const currentCache = readCache()
+            if (!currentCache?.tenants?.length || currentCache.user?.id !== session.user.id) {
+              const list = await fetchTenants(session.user.id)
+              if (cancelled) return
+              const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+              setTenants(list); setTenantId(tid ?? null)
+              if (tid) localStorage.setItem('ag_tenant_id', tid)
+              saveCache(session.user, list, tid)
+            }
           }
+          setTenantResolved(true)
           markReady()
           setSessionVersion(v => v + 1)
 
         } else if (event === 'SIGNED_IN') {
           setUser(session.user)
-          resolveTenants(session.user)
+          const list = await fetchTenants(session.user.id)
+          if (cancelled) return
+          const tid = pickTenant(list, localStorage.getItem('ag_tenant_id'))
+          setTenants(list); setTenantId(tid ?? null)
+          if (tid) localStorage.setItem('ag_tenant_id', tid)
+          saveCache(session.user, list, tid)
+          setTenantResolved(true)
           markReady()
           setSessionVersion(v => v + 1)
 
@@ -136,11 +152,11 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true; clearTimeout(t); subscription.unsubscribe() }
   }, [])
 
-  // ─── acoes publicas ───────────────────────────────────────────────────────
+  // ─── ações públicas ───────────────────────────────────────────────────────
 
   async function signIn(email, password) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw new Error(error.message || 'Credenciais invalidas')
+    if (error) throw new Error(error.message || 'Credenciais inválidas')
     return data.session
   }
 
@@ -152,7 +168,7 @@ export function AuthProvider({ children }) {
     supabase.auth.signOut().catch(() => {})
   }
 
-  // Exposto para paginas detectarem erros de JWT nas queries e forcarem logout.
+  // Exposto para páginas detectarem erros de JWT nas queries e forçarem logout.
   function handleAuthError(error) {
     if (!error) return false
     const msg = (error.message ?? '').toLowerCase()
