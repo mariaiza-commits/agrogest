@@ -18,6 +18,11 @@ export default function Vendas({ onAddBtn }) {
   const [contaReceber, setContaReceber] = useState('')
   const [recebData, setRecebData]       = useState('')
   const [salvandoRec, setSalvandoRec]   = useState(false)
+  const [modalAnexos, setModalAnexos]   = useState(null)  // venda obj
+  const [anexos, setAnexos]             = useState([])
+  const [uploadando, setUploadando]     = useState(false)
+  const [uploadTipo, setUploadTipo]     = useState('xml')
+  const [erroAnexo, setErroAnexo]       = useState('')
 
   const [form, setForm] = useState({
     carga_id: '', client_id: '',
@@ -198,6 +203,63 @@ export default function Vendas({ onAddBtn }) {
     load()
   }
 
+  async function abrirModalAnexos(venda) {
+    setModalAnexos(venda)
+    setErroAnexo('')
+    setAnexos([])
+    const { data, error } = await supabase
+      .from('venda_anexos')
+      .select('id,tipo,nome_arquivo,path,tamanho_bytes,created_at')
+      .eq('venda_id', venda.id)
+      .order('created_at')
+    if (error) setErroAnexo('Erro ao carregar anexos.')
+    else setAnexos(data ?? [])
+  }
+
+  async function uploadAnexo(e) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !modalAnexos) return
+    const ext = file.name.split('.').pop().toLowerCase()
+    const path = `${tenantId}/${modalAnexos.id}/${uploadTipo}-${Date.now()}.${ext}`
+    setUploadando(true); setErroAnexo('')
+    try {
+      const { error: upErr } = await supabase.storage.from('notas-fiscais').upload(path, file)
+      if (upErr) throw new Error(upErr.message)
+      const { error: insErr } = await supabase.from('venda_anexos').insert({
+        venda_id: modalAnexos.id,
+        tenant_id: tenantId,
+        tipo: uploadTipo,
+        path,
+        nome_arquivo: file.name,
+        tamanho_bytes: file.size,
+      })
+      if (insErr) {
+        await supabase.storage.from('notas-fiscais').remove([path])
+        throw new Error(insErr.message)
+      }
+      const { data } = await supabase.from('venda_anexos')
+        .select('id,tipo,nome_arquivo,path,tamanho_bytes,created_at')
+        .eq('venda_id', modalAnexos.id).order('created_at')
+      setAnexos(data ?? [])
+    } catch (err) {
+      setErroAnexo('Erro ao enviar: ' + err.message)
+    } finally { setUploadando(false) }
+  }
+
+  async function abrirAnexo(path) {
+    const { data, error } = await supabase.storage.from('notas-fiscais').createSignedUrl(path, 60)
+    if (error) return alert('Erro ao abrir arquivo: ' + error.message)
+    window.open(data.signedUrl, '_blank')
+  }
+
+  async function excluirAnexo(id, path) {
+    if (!window.confirm('Excluir este anexo?')) return
+    await supabase.storage.from('notas-fiscais').remove([path])
+    await supabase.from('venda_anexos').delete().eq('id', id)
+    setAnexos(prev => prev.filter(a => a.id !== id))
+  }
+
   const totalReceita  = vendas.reduce((s, v) => s + Number(v.valor_liquido ?? 0), 0)
   const totalPendente = vendas.filter(v => v.status_pagamento === 'pendente').reduce((s, v) => s + Number(v.valor_liquido ?? 0), 0)
   const statusColor   = { pendente:'var(--amber)', recebido:'var(--green)', pago:'var(--green)', atrasado:'var(--red)' }
@@ -289,6 +351,7 @@ export default function Vendas({ onAddBtn }) {
                               ↩ Desfazer
                             </button>
                           )}
+                          <button className="btn btn-sm" onClick={()=>abrirModalAnexos(v)} title="Notas fiscais">📎</button>
                           <button className="btn btn-sm" onClick={()=>openModal(v)}>✎</button>
                           <button className="btn btn-sm btn-danger" onClick={()=>excluir(v.id)}>✕</button>
                         </div>
@@ -369,6 +432,66 @@ export default function Vendas({ onAddBtn }) {
               <button className="btn btn-primary" onClick={receberVenda} disabled={salvandoRec} style={{flex:1}}>
                 {salvandoRec?'Salvando...':'✅ Confirmar recebimento'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL ANEXOS */}
+      {modalAnexos && (
+        <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&setModalAnexos(null)}>
+          <div className="modal" style={{maxWidth:500}}>
+            <div className="modal-header">
+              <h3>📎 Notas fiscais — {fmtDate(modalAnexos.data_venda)}</h3>
+              <button className="modal-close" onClick={()=>setModalAnexos(null)}>✕</button>
+            </div>
+            <div style={{marginBottom:16}}>
+              {/* Upload */}
+              <div style={{background:'var(--bg)',borderRadius:8,padding:'12px 14px',marginBottom:14}}>
+                <div style={{fontWeight:600,fontSize:13,marginBottom:10}}>Enviar arquivo</div>
+                <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                  <select value={uploadTipo} onChange={e=>setUploadTipo(e.target.value)}
+                    style={{padding:'6px 10px',borderRadius:6,border:'1px solid var(--border)',fontSize:13,background:'var(--surface)'}}>
+                    <option value="xml">XML</option>
+                    <option value="danfe">DANFE (PDF)</option>
+                    <option value="comprovante">Comprovante</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                  <label style={{
+                    display:'inline-flex',alignItems:'center',gap:6,
+                    padding:'6px 14px',borderRadius:6,border:'1px solid var(--border)',
+                    background:uploadando?'var(--bg)':'var(--surface)',
+                    cursor:uploadando?'not-allowed':'pointer',fontSize:13,fontWeight:600,
+                  }}>
+                    {uploadando ? 'Enviando...' : '⬆ Selecionar arquivo'}
+                    <input type="file" accept=".xml,.pdf,.jpg,.jpeg,.png" style={{display:'none'}}
+                      disabled={uploadando} onChange={uploadAnexo}/>
+                  </label>
+                </div>
+                {erroAnexo && <div style={{color:'var(--red)',fontSize:12,marginTop:8}}>{erroAnexo}</div>}
+              </div>
+
+              {/* Lista */}
+              {anexos.length === 0
+                ? <div className="empty" style={{padding:'16px 0'}}>Nenhum arquivo anexado.</div>
+                : <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                    {anexos.map(a => (
+                      <div key={a.id} style={{display:'flex',alignItems:'center',gap:10,background:'var(--bg)',borderRadius:8,padding:'10px 12px'}}>
+                        <span style={{fontSize:18}}>{a.tipo==='xml'?'📄':a.tipo==='danfe'?'🧾':a.tipo==='comprovante'?'✅':'📎'}</span>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:13,fontWeight:600,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{a.nome_arquivo}</div>
+                          <div style={{fontSize:11,color:'var(--text-muted)'}}>
+                            {a.tipo.toUpperCase()} · {a.tamanho_bytes ? (a.tamanho_bytes/1024).toFixed(0)+'KB' : '—'} · {fmtDate(a.created_at?.split('T')[0])}
+                          </div>
+                        </div>
+                        <button className="btn btn-sm" onClick={()=>abrirAnexo(a.path)} title="Abrir">↗</button>
+                        <button className="btn btn-sm btn-danger" onClick={()=>excluirAnexo(a.id,a.path)} title="Excluir">✕</button>
+                      </div>
+                    ))}
+                  </div>}
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={()=>setModalAnexos(null)}>Fechar</button>
             </div>
           </div>
         </div>
