@@ -177,10 +177,7 @@ export default function Dashboard() {
     const list = []
     if (receita > 0 && custo === 0) list.push({ type:'warning', text:'Custos não lançados no mês. O lucro pode estar superestimado.' })
     if (cultComReceita.length === 1) list.push({ type:'info', text:`Apenas a cultura ${cultComReceita[0]?.cultura} possui vendas no período.` })
-    if (lotes.length > 0) {
-      const top = [...lotes].sort((a,b)=>Number(b.receita_bruta)-Number(a.receita_bruta))[0]
-      if (top && receita > 0 && Number(top.receita_bruta)/receita > 0.7) list.push({ type:'info', text:`O lote ${top.lote} concentra ${pct(Number(top.receita_bruta), receita)} da receita do mês.` })
-    }
+
     if (totalAtrasado > 0) list.push({ type:'warning', text:`${atraso.length} conta(s) em atraso totalizando ${fmt(totalAtrasado)}.` })
     return list
   }, [kpis, lotes, culturas, atraso])
