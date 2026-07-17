@@ -382,7 +382,7 @@ export default function Vendas({ onAddBtn }) {
                   <option value="">— Selecione a carga —</option>
                   {cargas.map(c=>(
                     <option key={c.carga_id} value={c.carga_id}>
-                      {fmtDate(c.data)} — {Number((c.total_primeira||0)+(c.total_segunda||0)).toLocaleString('pt-BR')} cx
+                      {fmtDate(c.data)} — {Number((c.total_primeira||0)+(c.total_segunda||0)).toLocaleString('pt-BR')} cx{c.observacoes ? ` — ${c.observacoes}` : ''}
                     </option>
                   ))}
                 </select>
