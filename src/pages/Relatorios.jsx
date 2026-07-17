@@ -59,7 +59,7 @@ export default function Relatorios() {
 
     if (tipo === 'clientes') {
       let q = supabase.from('vendas')
-        .select('comprador, client_id, data_venda, data_vencimento, valor_total, valor_liquido, status_pagamento, quantidade_primeira, quantidade_segunda, clients(nome)')
+        .select('comprador, client_id, data_venda, data_vencimento, data_recebimento, valor_total, valor_liquido, status_pagamento, quantidade_primeira, quantidade_segunda, clients(nome)')
         .is('deleted_at', null)
         .order('comprador')
       if (filtroCliente) q = q.eq('client_id', filtroCliente)
@@ -67,16 +67,23 @@ export default function Relatorios() {
       if (dataFim)       q = q.lte('data_venda', dataFim)
       if (filtroStatus)  q = q.eq('status_pagamento', filtroStatus)
       const { data } = await q
-      rows = (data ?? []).map(v => ({
-        'Cliente':       v.clients?.nome || v.comprador || '—',
-        'Data Venda':    fmtDate(v.data_venda),
-        'Vencimento':    v.data_vencimento ? fmtDate(v.data_vencimento) : '—',
-        'Qtd 1ª (cx)':   v.quantidade_primeira ?? 0,
-        'Qtd 2ª (cx)':   v.quantidade_segunda ?? 0,
-        'Valor Bruto':   Number(v.valor_total ?? 0),
-        'Valor Líquido': Number(v.valor_liquido ?? 0),
-        'Status':        v.status_pagamento,
-      }))
+      rows = (data ?? []).map(v => {
+        const diasAtraso = v.data_recebimento && v.data_vencimento
+          ? Math.round((new Date(v.data_recebimento) - new Date(v.data_vencimento)) / 86400000)
+          : null
+        return {
+          'Cliente':          v.clients?.nome || v.comprador || '—',
+          'Data Venda':       fmtDate(v.data_venda),
+          'Vencimento':       v.data_vencimento ? fmtDate(v.data_vencimento) : '—',
+          'Data Recebimento': v.data_recebimento ? fmtDate(v.data_recebimento) : '—',
+          'Dias até pagar':   diasAtraso === null ? '—' : diasAtraso > 0 ? `+${diasAtraso}d atraso` : diasAtraso === 0 ? 'No prazo' : `${Math.abs(diasAtraso)}d antes`,
+          'Qtd 1ª (cx)':      v.quantidade_primeira ?? 0,
+          'Qtd 2ª (cx)':      v.quantidade_segunda ?? 0,
+          'Valor Bruto':      Number(v.valor_total ?? 0),
+          'Valor Líquido':    Number(v.valor_liquido ?? 0),
+          'Status':           v.status_pagamento,
+        }
+      })
     }
 
     else if (tipo === 'fornecedor') {
