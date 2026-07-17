@@ -112,39 +112,39 @@ export default function Dashboard() {
         new Promise((_, reject) => setTimeout(() => reject(new Error(`timeout:${label}`)), ms))
       ])
 
-      // Tudo numa unica ida e volta. O banco esta em us-west-2 (Oregon) e cada
-      // round trip custa ~200ms — rodar fn_dashboard_mes sozinho antes das views
-      // dobrava a espera sem ganho nenhum. Promise.allSettled mantem o
-      // comportamento de falha individual nao bloquear as outras.
-      const [dashR, resumoR, cultR, pagar7dR, emAtrasoR, receberR] = await withTimeout(
+      // fn_dashboard_mes separado para não bloquear os outros
+      const dashResult = await withTimeout(
+        supabase.rpc('fn_dashboard_mes', { p_mes: mesStr }),
+        25000, 'fn_dashboard_mes'
+      )
+      if (dashResult.error) {
+        console.error('[Dashboard] fn_dashboard_mes error:', dashResult.error)
+        if (handleAuthError(dashResult.error)) return
+      } else {
+        const d = dashResult.data
+        setKpis(Array.isArray(d) ? d[0] : d)
+      }
+
+      // Demais queries em paralelo, falhas individuais não bloqueiam
+      const [resumoR, cultR, pagar7dR, emAtrasoR, receberR] = await withTimeout(
         Promise.allSettled([
-          supabase.rpc('fn_dashboard_mes', { p_mes: mesStr }),
           supabase.from('vw_resumo_por_lote').select('*'),
           supabase.from('vw_resumo_por_cultura').select('*'),
           supabase.from('vw_contas_a_pagar').select('*').gte('data_vencimento', hojeStr).lte('data_vencimento', em7d),
           supabase.from('vw_contas_a_pagar').select('*').lt('data_vencimento', hojeStr).order('data_vencimento', { ascending: true }).limit(10),
           supabase.from('vw_contas_a_receber').select('*').order('data_vencimento', { ascending: true }).limit(5),
         ]),
-        25000, 'dashboard'
+        25000, 'views'
       )
 
       const ok = r => r.status === 'fulfilled' ? r.value.data : null
       const err = (r, name) => { if (r.status === 'rejected' || r.value?.error) console.error(`[Dashboard] ${name}:`, r.status === 'rejected' ? r.reason : r.value.error) }
-      err(dashR, 'fn_dashboard_mes')
       err(resumoR, 'vw_resumo_por_lote')
       err(cultR, 'vw_resumo_por_cultura')
       err(pagar7dR, 'vw_contas_a_pagar (7d)')
       err(emAtrasoR, 'vw_contas_a_pagar (atraso)')
       err(receberR, 'vw_contas_a_receber')
 
-      // Preserva o handleAuthError: se o JWT morreu, qualquer uma das 6 acusa.
-      const firstError = [dashR, resumoR, cultR, pagar7dR, emAtrasoR, receberR]
-        .map(r => r.status === 'fulfilled' ? r.value?.error : null)
-        .find(Boolean)
-      if (firstError && handleAuthError(firstError)) return
-
-      const d = ok(dashR)
-      if (d) setKpis(Array.isArray(d) ? d[0] : d)
       setLotes(ok(resumoR) ?? [])
       setCulturas(ok(cultR) ?? [])
       setVencer(ok(pagar7dR) ?? [])
