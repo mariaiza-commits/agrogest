@@ -180,12 +180,22 @@ export default function Vendas({ onAddBtn }) {
     if (!contaReceber) return alert('Selecione a conta.')
     if (!recebData) return alert('Informe a data do recebimento.')
     setSalvandoRec(true)
-    await supabase.from('vendas').update({
-      status_pagamento: 'recebido',
-      conta_financeira_id: contaReceber,
-      data_recebimento: recebData,
-    }).eq('id', modalReceber.id)
-    setSalvandoRec(false); setModalReceber(null); setContaReceber(''); setRecebData(''); load()
+    try {
+      const timeout = new Promise((_,reject) => setTimeout(() => reject(new Error('Tempo esgotado.')), 30000))
+      const { error } = await Promise.race([
+        supabase.rpc('fn_receber_venda', {
+          p_venda_id: modalReceber.id,
+          p_conta_id: contaReceber,
+          p_data_recebimento: recebData,
+        }),
+        timeout,
+      ])
+      if (error) throw new Error(error.message)
+      setModalReceber(null); setContaReceber(''); setRecebData(''); load()
+    } catch(err) {
+      console.error('[Vendas.receberVenda]', err)
+      if (!handleAuthError(err)) alert('Erro ao confirmar recebimento: ' + err.message)
+    } finally { setSalvandoRec(false) }
   }
 
   async function desfazerRecebimento(id) {
